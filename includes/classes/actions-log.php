@@ -48,6 +48,8 @@ $activities_references = array(
 							35	=> __('A client edited a category.','cftp_admin'),
 							36	=> __('A client deleted a category.','cftp_admin'),
 							37	=> __('An anonymous user downloaded a public file.','cftp_admin'),
+							38	=> __('A client account request was processed.','cftp_admin'),
+							39	=> __("A client's groups membership requests were processed.",'cftp_admin'),
 						);
  /**
  * More to be added soon.
@@ -129,4 +131,3 @@ class LogActions
 		$this->sql_query->execute( $params );
 	}
 }
-?>

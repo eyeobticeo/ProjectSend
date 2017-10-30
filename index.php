@@ -19,7 +19,11 @@ require_once('sys.includes.php');
 
 $page_title = __('Log in','cftp_admin');
 
+$body_class = array('login');
+
 include('header-unlogged.php');
+
+$login_button_text = __('Log in','cftp_admin');
 	
 	/**
 	 * Google Sign-in
@@ -36,251 +40,150 @@ include('header-unlogged.php');
 		$auth_url = $googleClient->createAuthUrl();
 	}
 	
-	/** The form was submitted */
-	if ($_POST) {
-		global $dbh;
-		$sysuser_password	= $_POST['login_form_pass'];
-		$selected_form_lang	= $_POST['login_form_lang'];
-	
-		/** Look up the system users table to see if the entered username exists */
-		$statement = $dbh->prepare("SELECT * FROM " . TABLE_USERS . " WHERE user= :username OR email= :email");
-		$statement->execute(
-						array(
-							':username'	=> $_POST['login_form_user'],
-							':email'	=> $_POST['login_form_user'],
-						)
-					);
-		$count_user = $statement->rowCount();
-		if ($count_user > 0){
-			/** If the username was found on the users table */
-			$statement->setFetchMode(PDO::FETCH_ASSOC);
-			while ( $row = $statement->fetch() ) {
-				$sysuser_username	= $row['user'];
-				$db_pass			= $row['password'];
-				$user_level			= $row["level"];
-				$active_status		= $row['active'];
-				$logged_id			= $row['id'];
-				$global_name		= $row['name'];
-			}
-			$check_password = $hasher->CheckPassword($sysuser_password, $db_pass);
-			if ($check_password) {
-			//if ($db_pass == $sysuser_password) {
-				if ($active_status != '0') {
-					/** Set SESSION values */
-					$_SESSION['loggedin'] = $sysuser_username;
-					$_SESSION['userlevel'] = $user_level;
-					$_SESSION['lang'] = $selected_form_lang;
 
-					/**
-					 * Language cookie
-					 * TODO: Implement.
-					 * Must decide how to refresh language in the form when the user
-					 * changes the language <select> field.
-					 * By using a cookie and not refreshing here, the user is
-					 * stuck in a language and must use it to recover password or
-					 * create account, since the lang cookie is only at login now.
-					 */
-					//setcookie('projectsend_language', $selected_form_lang, time() + (86400 * 30), '/');
-
-					if ($user_level != '0') {
-						$access_string = 'admin';
-						$_SESSION['access'] = $access_string;
-					}
-					else {
-						$access_string = $sysuser_username;
-						$_SESSION['access'] = $sysuser_username;
-					}
-
-					/** If "remember me" checkbox is on, set the cookie */
-					if (!empty($_POST['login_form_remember'])) {
-						/*
-						setcookie("loggedin",$sysuser_username,time()+COOKIE_EXP_TIME);
-						setcookie("password",$sysuser_password,time()+COOKIE_EXP_TIME);
-						setcookie("access",$access_string,time()+COOKIE_EXP_TIME);
-						setcookie("userlevel",$user_level,time()+COOKIE_EXP_TIME);
-						*/
-						setcookie("rememberwho",$sysuser_username,time()+COOKIE_EXP_TIME);
-					}
-					
-					/** Record the action log */
-					$new_log_action = new LogActions();
-					$log_action_args = array(
-											'action' => 1,
-											'owner_id' => $logged_id,
-											'affected_account_name' => $global_name
-										);
-					$new_record_action = $new_log_action->log_action_save($log_action_args);
-
-					if ($user_level == '0') {
-						header("location:".BASE_URI."my_files/");
-					}
-					else {
-						header("location:home.php");
-					}
-					exit;
-				}
-				else {
-					$errorstate = 'inactive_client';
-				}
-			}
-			else {
-				//$errorstate = 'wrong_password';
-				$errorstate = 'invalid_credentials';
-			}
-		}
-		else {
-			//$errorstate = 'wrong_username';
-			$errorstate = 'invalid_credentials';
-		}
-	
+	if ( isset($_SESSION['errorstate'] ) ) {
+		$errorstate = $_SESSION['errorstate'];
+		unset($_SESSION['errorstate']);
 	}
-
-if ( isset($_SESSION['errorstate'] ) ) {
-	$errorstate = $_SESSION['errorstate'];
-	unset($_SESSION['errorstate']);
-}
 ?>
-		<h2 class="hidden"><?php echo $page_title; ?></h2>
+<div class="col-xs-12 col-sm-12 col-lg-4 col-lg-offset-4">
 
-		<div class="container">
+	<?php echo generate_branding_layout(); ?>
 
-			<?php echo generate_branding_layout(); ?>
-
-			<div class="row">
-				<div class="col-xs-12 col-xs-offset-0 col-sm-8 col-sm-offset-2 col-md-4 col-md-offset-4 white-box">
-					<div class="white-box-interior">
-						<?php
-							/**
-							 * Show login errors
-							 */
-							if (isset($errorstate)) {
-								switch ($errorstate) {
-									case 'invalid_credentials':
-										$login_err_message = __("The supplied credentials are not valid.",'cftp_admin');
-										break;
-									case 'wrong_username':
-										$login_err_message = __("The supplied username doesn't exist.",'cftp_admin');
-										break;
-									case 'wrong_password':
-										$login_err_message = __("The supplied password is incorrect.",'cftp_admin');
-										break;
-									case 'inactive_client':
-										$login_err_message = __("This account is not active.",'cftp_admin');
-										if (CLIENTS_AUTO_APPROVE == 0) {
-											$login_err_message .= ' '.__("If you just registered, please wait until a system administrator approves your account.",'cftp_admin');
+	<div class="white-box">
+		<div class="white-box-interior">
+			<div class="ajax_response">
+				<?php
+					/** Coming from an external form */
+					if ( isset( $_GET['error'] ) ) {
+						switch ( $_GET['error'] ) {
+							case 1:
+								echo system_message('error',__("The supplied credentials are not valid.",'cftp_admin'),'login_error');
+								break;
+							case 'timeout':
+								echo system_message('error',__("Session timed out. Please log in again.",'cftp_admin'),'login_error');
+								break;
+						}
+					}
+				?>
+			</div>
+			<script type="text/javascript">
+				$(document).ready(function() {
+					$("#login_form").submit(function(e) {
+						e.preventDefault();
+						e.stopImmediatePropagation();
+						$('.ajax_response').html();
+						clean_form(this);
+		
+						is_complete(this.username,'<?php _e('Username was not completed','cftp_admin'); ?>');
+						is_complete(this.password,'<?php _e('Password was not completed','cftp_admin'); ?>');
+		
+						// show the errors or continue if everything is ok
+						if (show_form_errors() == false) {
+							return false;
+						}
+						else {
+							var url = $(this).attr('action');
+							$('.ajax_response').html('');
+							$('#submit').html('<i class="fa fa-cog fa-spin fa-fw"></i><span class="sr-only"></span> <?php _e('Logging in','cftp_admin'); ?>...');
+							$.ajax({
+									cache: false,
+									type: "get",
+									url: url,
+									data: $(this).serialize(), // serializes the form's elements.
+									success: function(response)
+									{
+										var json = jQuery.parseJSON(response);
+										if ( json.status == 'success' ) {
+											//$('.ajax_response').html(json.message);
+											$('#submit').html('<i class="fa fa-check"></i><span class="sr-only"></span> <?php _e('Redirecting','cftp_admin'); ?>...');
+											$('#submit').removeClass('btn-primary').addClass('btn-success');
+											setTimeout('window.location.href = "'+json.location+'"', 1000);
 										}
-										break;
-									case 'no_self_registration':
-										$login_err_message = __('Client self registration is not allowed. If you need an account, please contact a system administrator.','cftp_admin');
-										break;
-									case 'no_account':
-										$login_err_message = __('Sign-in with Google cannot be used to create new accounts at this time.','cftp_admin');
-										break;
-									case 'access_denied':
-										$login_err_message = __('You must approve the requested permissions to sign in with Google.','cftp_admin');
-										break;
-								}
-				
-								echo system_message('error',$login_err_message,'login_error');
-							}
-						?>
-					
-						<script type="text/javascript">
-							$(document).ready(function() {
-								$("form").submit(function() {
-									clean_form(this);
-					
-									is_complete(this.login_form_user,'<?php _e('Username was not completed','cftp_admin'); ?>');
-									is_complete(this.login_form_pass,'<?php _e('Password was not completed','cftp_admin'); ?>');
-					
-									// show the errors or continue if everything is ok
-									if (show_form_errors() == false) { return false; }
-								});
+										else {
+											$('.ajax_response').html(json.message);
+											$('#submit').html('<?php echo $login_button_text; ?>');
+										}
+									}
 							});
-						</script>
-					
-						<form action="index.php" method="post" name="login_admin" role="form">
-							<fieldset>
-								<div class="form-group">
-									<label for="login_form_user"><?php _e('Username','cftp_admin'); ?> / <?php _e('E-mail','cftp_admin'); ?></label>
-									<input type="text" name="login_form_user" id="login_form_user" value="<?php if (isset($sysuser_username)) { echo htmlspecialchars($sysuser_username); } ?>" class="form-control" />
-								</div>
+							return false;
+						}
+					});
+				});
+			</script>
+		
+			<form action="process.php" name="login_admin" role="form" id="login_form">
+				<input type="hidden" name="do" value="login">
+				<fieldset>
+					<div class="form-group">
+						<label for="username"><?php _e('Username','cftp_admin'); ?> / <?php _e('E-mail','cftp_admin'); ?></label>
+						<input type="text" name="username" id="username" value="<?php if (isset($sysuser_username)) { echo htmlspecialchars($sysuser_username); } ?>" class="form-control" autofocus />
+					</div>
 
-								<div class="form-group">
-									<label for="login_form_pass"><?php _e('Password','cftp_admin'); ?></label>
-									<input type="password" name="login_form_pass" id="login_form_pass" class="form-control" />
-								</div>
+					<div class="form-group">
+						<label for="password"><?php _e('Password','cftp_admin'); ?></label>
+						<input type="password" name="password" id="password" class="form-control" />
+					</div>
 
-								<div class="form-group">
-									<label for="login_form_lang"><?php _e('Language','cftp_admin'); ?></label>
-									<select name="login_form_lang" id="login_form_lang" class="form-control">
+					<div class="form-group">
+						<label for="language"><?php _e('Language','cftp_admin'); ?></label>
+						<select name="language" id="language" class="form-control">
+							<?php
+								// scan for language files
+								$available_langs = get_available_languages();
+								foreach ($available_langs as $filename => $lang_name) {
+							?>
+									<option value="<?php echo $filename;?>" <?php echo ( LOADED_LANG == $filename ) ? 'selected' : ''; ?>>
 										<?php
-											// scan for language files
-											$available_langs = get_available_languages();
-											foreach ($available_langs as $filename => $lang_name) {
-										?>
-												<option value="<?php echo $filename;?>" <?php echo ( LOADED_LANG == $filename ) ? 'selected' : ''; ?>>
-													<?php
-														echo $lang_name;
-														if ( $filename == SITE_LANG ) {
-															echo ' [' . __('default','cftp_admin') . ']';
-														}
-													?>
-												</option>
-										<?php
+											echo $lang_name;
+											if ( $filename == SITE_LANG ) {
+												echo ' [' . __('default','cftp_admin') . ']';
 											}
 										?>
-									</select>
-								</div>
-<?php
-/*
-								<label for="login_form_remember">
-									<input type="checkbox" name="login_form_remember" id="login_form_remember" value="on" />
-									<?php _e('Remember me','cftp_admin'); ?>
-								</label>
-*/?>
-								<div class="inside_form_buttons">
-									<button type="submit" name="submit" class="btn btn-wide btn-primary"><?php _e('Log in','cftp_admin'); ?></button>
-								</div>
-
-								<div class="social-login">
-									<?php if(GOOGLE_SIGNIN_ENABLED == '1'): ?>
-										<a href="<?php echo $auth_url; ?>" name="Sign in with Google" class="google-login"><img src="<?php echo BASE_URI; ?>img/google/btn_google_signin_light_normal_web.png" alt="Google Signin" /></a>
-									<?php endif; ?>
-								</div>
-							</fieldset>
-						</form>
-			
-						<div class="login_form_links">
-							<p id="reset_pass_link"><?php _e("Forgot your password?",'cftp_admin'); ?> <a href="<?php echo BASE_URI; ?>reset-password.php"><?php _e('Set up a new one.','cftp_admin'); ?></a></p>
-							<?php
-								if (CLIENTS_CAN_REGISTER == '1') {
-							?>
-									<p id="register_link"><?php _e("Don't have an account yet?",'cftp_admin'); ?> <a href="<?php echo BASE_URI; ?>register.php"><?php _e('Register as a new client.','cftp_admin'); ?></a></p>
-							<?php
-								} else {
-							?>
-									<p><?php _e("This server does not allow self registrations.",'cftp_admin'); ?></p>
-									<p><?php _e("If you need an account, please contact a server administrator.",'cftp_admin'); ?></p>
+									</option>
 							<?php
 								}
 							?>
-						</div>
+						</select>
 					</div>
-				</div>
-			</div>	
-		</div> <!-- container -->
-	</div> <!-- main (from header) -->
-
-	<?php
-		default_footer_info( false );
-
-		load_js_files();
-	?>
-
-</body>
-</html>
 <?php
-	$dbh = null;
-	ob_end_flush();
-?>
+/*
+					<label for="login_form_remember">
+						<input type="checkbox" name="login_form_remember" id="login_form_remember" value="on" />
+						<?php _e('Remember me','cftp_admin'); ?>
+					</label>
+*/?>
+					<div class="inside_form_buttons">
+						<button type="submit" id="submit" class="btn btn-wide btn-primary"><?php echo $login_button_text; ?></button>
+					</div>
+
+					<div class="social-login">
+						<?php if(GOOGLE_SIGNIN_ENABLED == '1'): ?>
+							<a href="<?php echo $auth_url; ?>" name="Sign in with Google" class="google-login"><img src="<?php echo BASE_URI; ?>img/google/btn_google_signin_light_normal_web.png" alt="Google Signin" /></a>
+						<?php endif; ?>
+					</div>
+				</fieldset>
+			</form>
+
+			<div class="login_form_links">
+				<p id="reset_pass_link"><?php _e("Forgot your password?",'cftp_admin'); ?> <a href="<?php echo BASE_URI; ?>reset-password.php"><?php _e('Set up a new one.','cftp_admin'); ?></a></p>
+				<?php
+					if (CLIENTS_CAN_REGISTER == '1') {
+				?>
+						<p id="register_link"><?php _e("Don't have an account yet?",'cftp_admin'); ?> <a href="<?php echo BASE_URI; ?>register.php"><?php _e('Register as a new client.','cftp_admin'); ?></a></p>
+				<?php
+					} else {
+				?>
+						<p><?php _e("This server does not allow self registrations.",'cftp_admin'); ?></p>
+						<p><?php _e("If you need an account, please contact a server administrator.",'cftp_admin'); ?></p>
+				<?php
+					}
+				?>
+			</div>
+
+		</div>
+	</div>
+</div>
+
+<?php
+	include('footer.php');

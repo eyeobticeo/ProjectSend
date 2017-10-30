@@ -78,7 +78,7 @@ if (!empty($found_notifications)) {
 		$file_data[$row['id']] = array(
 									'id'			=> $row['id'],
 									'filename'		=> $row['filename'],
-									'description'	=> $row['description']
+									'description'	=> htmlentities_allowed($row['description'])
 								);
 	}
 	
@@ -214,7 +214,7 @@ if (!empty($found_notifications)) {
 		foreach ($notes_to_admin as $mail_username => $admin_files) {
 			
 			/** Check if the admin is active */
-			if ($creators_data[$mail_username]['active'] == '1') {
+			if (isset($creators_data[$mail_username]) && $creators_data[$mail_username]['active'] == '1') {
 				/** Reset the files list UL contents */
 				$files_list = '';
 				foreach ($admin_files as $client_uploader => $mail_files) {
@@ -330,4 +330,3 @@ if (!empty($found_notifications)) {
 	 echo '<h2>Notifications sent query</h2><br />' . $notifications_sent_query . '<br /><br />';
 	 */
 }
-?>

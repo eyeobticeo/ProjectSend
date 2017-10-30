@@ -6,6 +6,10 @@
  * @subpackage	Clients
  *
  */
+$load_scripts	= array(
+						'chosen',
+					); 
+
 $allowed_levels = array(9,8);
 require_once('sys.includes.php');
 
@@ -36,23 +40,25 @@ if ($_POST) {
 	$add_client_data_addr = (isset($_POST["add_client_form_address"])) ? encode_html($_POST["add_client_form_address"]) : '';
 	$add_client_data_phone = (isset($_POST["add_client_form_phone"])) ? encode_html($_POST["add_client_form_phone"]) : '';
 	$add_client_data_intcont = (isset($_POST["add_client_form_intcont"])) ? encode_html($_POST["add_client_form_intcont"]) : '';
+	$add_client_data_maxfilesize = (isset($_POST["add_client_form_maxfilesize"])) ? encode_html($_POST["add_client_form_maxfilesize"]) : '';
 	$add_client_data_notity = (isset($_POST["add_client_form_notify"])) ? 1 : 0;
 	$add_client_data_active = (isset($_POST["add_client_form_active"])) ? 1 : 0;
 
 	/** Arguments used on validation and client creation. */
 	$new_arguments = array(
-							'id' => '',
-							'username' => $add_client_data_user,
-							'password' => $_POST['add_client_form_pass'],
+							'id'			=> '',
+							'username'		=> $add_client_data_user,
+							'password'		=> $_POST['add_client_form_pass'],
 							//'password_repeat' => $_POST['add_client_form_pass2'],
-							'name' => $add_client_data_name,
-							'email' => $add_client_data_email,
-							'address' => $add_client_data_addr,
-							'phone' => $add_client_data_phone,
-							'contact' => $add_client_data_intcont,
-							'notify' => $add_client_data_notity,
-							'active' => $add_client_data_active,
-							'type' => 'new_client'
+							'name'			=> $add_client_data_name,
+							'email'			=> $add_client_data_email,
+							'address'		=> $add_client_data_addr,
+							'phone'			=> $add_client_data_phone,
+							'contact'		=> $add_client_data_intcont,
+							'notify'		=> $add_client_data_notity,
+							'active'		=> $add_client_data_active,
+							'max_file_size'	=> $add_client_data_maxfilesize,
+							'type'			=> 'new_client',
 						);
 
 	/** Validate the information from the posted form. */
@@ -61,80 +67,85 @@ if ($_POST) {
 	/** Create the client if validation is correct. */
 	if ($new_validate == 1) {
 		$new_response = $new_client->create_client($new_arguments);
+		
+		$add_to_groups = (!empty( $_POST['add_client_group_request'] ) ) ? $_POST['add_client_group_request'] : '';
+		if ( !empty( $add_to_groups ) ) {
+			array_map('encode_html', $add_to_groups);
+			$memberships	= new MembersActions;
+			$arguments		= array(
+									'client_id'	=> $new_response['new_id'],
+									'group_ids'	=> $add_to_groups,
+									'added_by'	=> CURRENT_USER_USERNAME,
+								);
+	
+			$memberships->client_add_to_groups($arguments);
+		}
 	}
 	
 }
 ?>
 
-<div id="main">
-	<h2><?php echo $page_title; ?></h2>
-	
-	<div class="container">
-		<div class="row">
-			<div class="col-xs-12 col-xs-offset-0 col-sm-8 col-sm-offset-2 col-md-6 col-md-offset-3 white-box">
-				<div class="white-box-interior">
-		
-					<?php
-						/**
-						 * If the form was submited with errors, show them here.
-						 */
-						$valid_me->list_errors();
-					?>
-					
-					<?php
-						if (isset($new_response)) {
-							/**
-							 * Get the process state and show the corresponding ok or error messages.
-							 */
-							switch ($new_response['actions']) {
-								case 1:
-									$msg = __('Client added correctly.','cftp_admin');
-									echo system_message('ok',$msg);
+<div class="col-xs-12 col-sm-12 col-lg-6">
+	<div class="white-box">
+		<div class="white-box-interior">
+			<?php
+				/**
+				 * If the form was submited with errors, show them here.
+				 */
+				$valid_me->list_errors();
+			?>
 			
-									/** Record the action log */
-									$new_log_action = new LogActions();
-									$log_action_args = array(
-															'action' => 3,
-															'owner_id' => $global_id,
-															'affected_account' => $new_response['new_id'],
-															'affected_account_name' => $add_client_data_name
-														);
-									$new_record_action = $new_log_action->log_action_save($log_action_args);
-								break;
-								case 0:
-									$msg = __('There was an error. Please try again.','cftp_admin');
-									echo system_message('error',$msg);
-								break;
-							}
-							/**
-							 * Show the ok or error message for the email notification.
-							 */
-							switch ($new_response['email']) {
-								case 1:
-									$msg = __('An e-mail notification with login information was sent to your client.','cftp_admin');
-									echo system_message('ok',$msg);
-								break;
-								case 0:
-									$msg = __("E-mail notification couldn't be sent.",'cftp_admin');
-									echo system_message('error',$msg);
-								break;
-							}
-						}
-						else {
-							/**
-							 * If not $new_response is set, it means we are just entering for the first time.
-							 * Include the form.
-							 */
-							$clients_form_type = 'new_client';
-							include('clients-form.php');
-						}
-					?>
-				</div>
-			</div>
+			<?php
+				if (isset($new_response)) {
+					/**
+					 * Get the process state and show the corresponding ok or error messages.
+					 */
+					switch ($new_response['actions']) {
+						case 1:
+							$msg = __('Client added correctly.','cftp_admin');
+							echo system_message('ok',$msg);
+	
+							/** Record the action log */
+							$new_log_action = new LogActions();
+							$log_action_args = array(
+													'action' => 3,
+													'owner_id' => CURRENT_USER_ID,
+													'affected_account' => $new_response['new_id'],
+													'affected_account_name' => $add_client_data_name
+												);
+							$new_record_action = $new_log_action->log_action_save($log_action_args);
+						break;
+						case 0:
+							$msg = __('There was an error. Please try again.','cftp_admin');
+							echo system_message('error',$msg);
+						break;
+					}
+					/**
+					 * Show the ok or error message for the email notification.
+					 */
+					switch ($new_response['email']) {
+						case 1:
+							$msg = __('An e-mail notification with login information was sent to your client.','cftp_admin');
+							echo system_message('ok',$msg);
+						break;
+						case 0:
+							$msg = __("E-mail notification couldn't be sent.",'cftp_admin');
+							echo system_message('error',$msg);
+						break;
+					}
+				}
+				else {
+					/**
+					 * If not $new_response is set, it means we are just entering for the first time.
+					 * Include the form.
+					 */
+					$clients_form_type = 'new_client';
+					include('clients-form.php');
+				}
+			?>
 		</div>
 	</div>
 </div>
 
 <?php
 	include('footer.php');
-?>

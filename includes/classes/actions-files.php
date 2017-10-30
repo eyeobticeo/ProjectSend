@@ -21,7 +21,7 @@ class FilesActions
 	{
 		$this->can_delete		= false;
 		$this->result			= '';
-		$this->check_level		= array(9,8,0);
+		$this->check_level		= array(9,8,7,0);
 
 		if (isset($rel_id)) {
 			/** Do a permissions check */
@@ -34,6 +34,11 @@ class FilesActions
 				while( $this->row = $this->sql->fetch() ) {
 					if ( CURRENT_USER_LEVEL == '0' ) {
 						if ( CLIENTS_CAN_DELETE_OWN_FILES == '1' && $this->row['uploader'] == CURRENT_USER_USERNAME ) {
+							$this->can_delete	= true;
+						}
+					}
+					elseif ( CURRENT_USER_LEVEL == '7' ) {
+						if ( $this->row['uploader'] == CURRENT_USER_USERNAME ) {
 							$this->can_delete	= true;
 						}
 					}
@@ -72,10 +77,11 @@ class FilesActions
 		if (isset($file_id)) {
 			/** Do a permissions check */
 			if (isset($this->check_level) && in_session_or_cookies($this->check_level)) {
-				$this->sql = $this->dbh->prepare("UPDATE " . TABLE_FILES_RELATIONS . " SET hidden=:hidden WHERE file_id = :file_id AND $modify_type = :modify_id");
+				$this->sql = $this->dbh->prepare("UPDATE " . TABLE_FILES_RELATIONS . " SET hidden=:hidden WHERE file_id = :file_id AND :modify_type = :modify_id");
 				$this->sql->bindParam(':hidden', $change_to, PDO::PARAM_INT);
 				$this->sql->bindParam(':file_id', $file_id, PDO::PARAM_INT);
-				$this->sql->bindParam(':modify_id', $modify_id, PDO::PARAM_INT);
+                $this->sql->bindParam(':modify_type', $modify_type, PDO::PARAM_INT);
+                $this->sql->bindParam(':modify_id', $modify_id, PDO::PARAM_INT);
 				$this->sql->execute();
 			}
 		}
@@ -100,14 +106,13 @@ class FilesActions
 		if (isset($file_id)) {
 			/** Do a permissions check */
 			if (isset($this->check_level) && in_session_or_cookies($this->check_level)) {
-				$this->sql = $this->dbh->prepare("DELETE FROM " . TABLE_FILES_RELATIONS . " WHERE file_id = :file_id AND $modify_type = :modify_id");
+				$this->sql = $this->dbh->prepare("DELETE FROM " . TABLE_FILES_RELATIONS . " WHERE file_id = :file_id AND :modify_type = :modify_id");
 				$this->sql->bindParam(':file_id', $file_id, PDO::PARAM_INT);
-				$this->sql->bindParam(':modify_id', $modify_id, PDO::PARAM_INT);
+                $this->sql->bindParam(':modify_type', $modify_type, PDO::PARAM_INT);
+                $this->sql->bindParam(':modify_id', $modify_id, PDO::PARAM_INT);
 				$this->sql->execute();
 			}
 		}
 	}
 
 }
-
-?>

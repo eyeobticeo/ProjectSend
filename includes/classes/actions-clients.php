@@ -55,6 +55,7 @@ class ClientActions
 		$this->phone = $arguments['phone'];
 		$this->contact = $arguments['contact'];
 		$this->notify = $arguments['notify'];
+		$this->max_file_size = ( !empty( $arguments['max_file_size'] ) ) ? $arguments['max_file_size'] : 0;
 		$this->type = $arguments['type'];
 		$this->recaptcha = ( isset( $arguments['recaptcha'] ) ) ? $arguments['recaptcha'] : '';
 
@@ -65,7 +66,8 @@ class ClientActions
 		$valid_me->validate('completed',$this->name,$validation_no_name);
 		$valid_me->validate('completed',$this->email,$validation_no_email);
 		$valid_me->validate('email',$this->email,$validation_invalid_mail);
-		
+		$valid_me->validate('number',$this->max_file_size,$validation_file_size);
+
 		/**
 		 * Validations for NEW CLIENT submission only.
 		 */
@@ -78,7 +80,7 @@ class ClientActions
 			$valid_me->validate('completed',$this->username,$validation_no_user);
 			$valid_me->validate('alpha_dot',$this->username,$validation_alpha_user);
 			$valid_me->validate('length',$this->username,$validation_length_user,MIN_USER_CHARS,MAX_USER_CHARS);
-			
+
 			$this->validate_password = true;
 		}
 		/**
@@ -130,18 +132,20 @@ class ClientActions
 		$this->state = array();
 
 		/** Define the account information */
-		$this->id			= $arguments['id'];
-		$this->name			= $arguments['name'];
-		$this->email		= $arguments['email'];
-		$this->username		= $arguments['username'];
+		$this->id				= $arguments['id'];
+		$this->name				= encode_html($arguments['name']);
+		$this->email			= encode_html($arguments['email']);
+		$this->username		= encode_html($arguments['username']);
 		$this->password		= $arguments['password'];
 		//$this->password_repeat = $arguments['password_repeat'];
-		$this->address		= $arguments['address'];
-		$this->phone		= $arguments['phone'];
-		$this->contact		= $arguments['contact'];
-		$this->notify		= ( $arguments['notify'] == '1' ) ? 1 : 0;
-		$this->active		= ( $arguments['active'] == '1' ) ? 1 : 0;
-		$this->enc_password	= $hasher->HashPassword($this->password);
+		$this->address			= encode_html($arguments['address']);
+		$this->phone			= encode_html($arguments['phone']);
+		$this->contact			= encode_html($arguments['contact']);
+		$this->notify			= ( $arguments['notify'] == '1' ) ? 1 : 0;
+		$this->max_file_size	= ( !empty( $arguments['max_file_size'] ) ) ? $arguments['max_file_size'] : 0;
+		$this->request			= ( !empty( $arguments['account_requested'] ) ) ? $arguments['account_requested'] : 0;
+		$this->active			= ( $arguments['active'] );
+		$this->enc_password		= $hasher->HashPassword($this->password);
 
 		if (strlen($this->enc_password) >= 20) {
 
@@ -149,11 +153,11 @@ class ClientActions
 
 			/** Who is creating the client? */
 			$this->this_admin = get_current_user_username();
-	
+
 			/** Insert the client information into the database */
 			$this->timestamp = time();
-			$this->sql_query = $this->dbh->prepare("INSERT INTO " . TABLE_USERS . " (name,user,password,address,phone,email,notify,contact,created_by,active)"
-												."VALUES (:name, :username, :password, :address, :phone, :email, :notify, :contact, :admin, :active)");
+			$this->sql_query = $this->dbh->prepare("INSERT INTO " . TABLE_USERS . " (name,user,password,address,phone,email,notify,contact,created_by,active,account_requested,max_file_size)"
+												."VALUES (:name, :username, :password, :address, :phone, :email, :notify, :contact, :admin, :active, :request, :max_file_size)");
 			$this->sql_query->bindParam(':name', $this->name);
 			$this->sql_query->bindParam(':username', $this->username);
 			$this->sql_query->bindParam(':password', $this->enc_password);
@@ -164,13 +168,15 @@ class ClientActions
 			$this->sql_query->bindParam(':contact', $this->contact);
 			$this->sql_query->bindParam(':admin', $this->this_admin);
 			$this->sql_query->bindParam(':active', $this->active, PDO::PARAM_INT);
+			$this->sql_query->bindParam(':request', $this->request, PDO::PARAM_INT);
+			$this->sql_query->bindParam(':max_file_size', $this->max_file_size, PDO::PARAM_INT);
 
 			$this->sql_query->execute();
-	
+
 			if ($this->sql_query) {
 				$this->state['actions']	= 1;
 				$this->state['new_id']	= $this->dbh->lastInsertId();
-	
+
 				/** Send account data by email */
 				$this->notify_client = new PSend_Email();
 				$this->email_arguments = array(
@@ -180,7 +186,7 @@ class ClientActions
 												'password'	=> $this->password
 											);
 				$this->notify_send = $this->notify_client->psend_send_email($this->email_arguments);
-	
+
 				if ($this->notify_send == 1){
 					$this->state['email'] = 1;
 				}
@@ -210,37 +216,39 @@ class ClientActions
 		$this->state = array();
 
 		/** Define the account information */
-		$this->id			= $arguments['id'];
-		$this->name			= $arguments['name'];
-		$this->email		= $arguments['email'];
+		$this->id				= $arguments['id'];
+		$this->name				= encode_html($arguments['name']);
 		$this->password		= $arguments['password'];
-		$this->address		= $arguments['address'];
-		$this->phone		= $arguments['phone'];
-		$this->contact		= $arguments['contact'];
-		$this->notify		= ( $arguments['notify'] == '1' ) ? 1 : 0;
-		$this->active		= ( $arguments['active'] == '1' ) ? 1 : 0;
-		$this->enc_password	= $hasher->HashPassword($arguments['password']);
+		$this->email			= encode_html($arguments['email']);
+		$this->address			= encode_html($arguments['address']);
+		$this->phone			= encode_html($arguments['phone']);
+		$this->contact			= encode_html($arguments['contact']);
+		$this->notify			= ( $arguments['notify'] == '1' ) ? 1 : 0;
+		$this->active			= ( $arguments['active'] == '1' ) ? 1 : 0;
+		$this->max_file_size	= ( !empty( $arguments['max_file_size'] ) ) ? $arguments['max_file_size'] : 0;
+		$this->enc_password		= $hasher->HashPassword($arguments['password']);
 
 		if (strlen($this->enc_password) >= 20) {
 
 			$this->state['hash'] = 1;
 
 			/** SQL query */
-			$this->edit_client_query = "UPDATE " . TABLE_USERS . " SET 
+			$this->edit_client_query = "UPDATE " . TABLE_USERS . " SET
 										name = :name,
 										address = :address,
 										phone = :phone,
 										email = :email,
 										contact = :contact,
 										notify = :notify,
-										active = :active
+										active = :active,
+										max_file_size = :max_file_size
 										";
-	
+
 			/** Add the password to the query if it's not the dummy value '' */
 			if (!empty($arguments['password'])) {
 				$this->edit_client_query .= ", password = :password";
 			}
-	
+
 			$this->edit_client_query .= " WHERE id = :id";
 
 
@@ -252,6 +260,7 @@ class ClientActions
 			$this->sql_query->bindParam(':contact', $this->contact);
 			$this->sql_query->bindParam(':notify', $this->notify, PDO::PARAM_INT);
 			$this->sql_query->bindParam(':active', $this->active, PDO::PARAM_INT);
+			$this->sql_query->bindParam(':max_file_size', $this->max_file_size, PDO::PARAM_INT);
 			$this->sql_query->bindParam(':id', $this->id, PDO::PARAM_INT);
 			if (!empty($arguments['password'])) {
 				$this->sql_query->bindParam(':password', $this->enc_password);
@@ -259,7 +268,7 @@ class ClientActions
 
 			$this->sql_query->execute();
 
-	
+
 			if ($this->sql_query) {
 				$this->state['query'] = 1;
 			}
@@ -270,7 +279,7 @@ class ClientActions
 		else {
 			$this->state['hash'] = 0;
 		}
-		
+
 		return $this->state;
 	}
 
@@ -283,7 +292,7 @@ class ClientActions
 			/** Do a permissions check */
 			if (isset($this->check_level) && in_session_or_cookies($this->check_level)) {
 				$this->sql = $this->dbh->prepare('DELETE FROM ' . TABLE_USERS . ' WHERE id=:id');
-				$this->sql->bindParam(':id', $client_id, PDO::PARAM_INT);
+				$this->sql->bindValue(':id', $client_id, PDO::PARAM_INT);
 				$this->sql->execute();
 			}
 		}
@@ -299,13 +308,64 @@ class ClientActions
 			/** Do a permissions check */
 			if (isset($this->check_level) && in_session_or_cookies($this->check_level)) {
 				$this->sql = $this->dbh->prepare('UPDATE ' . TABLE_USERS . ' SET active=:active_state WHERE id=:id');
-				$this->sql->bindParam(':active_state', $change_to, PDO::PARAM_INT);
-				$this->sql->bindParam(':id', $client_id, PDO::PARAM_INT);
-				$this->sql->execute();
+				$this->sql->bindValue(':active_state', $change_to, PDO::PARAM_INT);
+				$this->sql->bindValue(':id', $client_id, PDO::PARAM_INT);
+				$this->status = $this->sql->execute();
 			}
 		}
+		else {
+			$this->status = false;
+		}
+
+		return $this->status;
+	}
+
+	/**
+	 * Approve account
+	 */
+	function client_account_approve($client_id)
+	{
+		$this->check_level = array(9,8);
+		if (isset($client_id)) {
+			/** Do a permissions check */
+			if (isset($this->check_level) && in_session_or_cookies($this->check_level)) {
+				$this->sql = $this->dbh->prepare('UPDATE ' . TABLE_USERS . ' SET active=:active, account_requested=:requested, account_denied=:denied WHERE id=:id');
+				$this->sql->bindValue(':active', 1, PDO::PARAM_INT);
+				$this->sql->bindValue(':requested', 0, PDO::PARAM_INT);
+				$this->sql->bindValue(':denied', 0, PDO::PARAM_INT);
+				$this->sql->bindValue(':id', $client_id, PDO::PARAM_INT);
+				$this->status = $this->sql->execute();
+			}
+		}
+		else {
+			$this->status = false;
+		}
+
+		return $this->status;
+	}
+
+	/**
+	 * Deny account
+	 */
+	function client_account_deny($client_id)
+	{
+		$this->check_level = array(9,8);
+		if (isset($client_id)) {
+			/** Do a permissions check */
+			if (isset($this->check_level) && in_session_or_cookies($this->check_level)) {
+				$this->sql = $this->dbh->prepare('UPDATE ' . TABLE_USERS . ' SET active=:active, account_requested=:account_requested, account_denied=:account_denied WHERE id=:id');
+				$this->sql->bindValue(':active', 0, PDO::PARAM_INT);
+				$this->sql->bindValue(':account_requested', 1, PDO::PARAM_INT);
+				$this->sql->bindValue(':account_denied', 1, PDO::PARAM_INT);
+				$this->sql->bindValue(':id', $client_id, PDO::PARAM_INT);
+				$this->status = $this->sql->execute();
+			}
+		}
+		else {
+			$this->status = false;
+		}
+
+		return $this->status;
 	}
 
 }
-
-?>

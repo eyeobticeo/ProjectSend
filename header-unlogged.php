@@ -11,7 +11,9 @@
  * where is it being called from.
  */
 if ( defined('IS_INSTALL') ) {
-	define( 'BASE_URI', '../' );
+	if ( !defined('BASE_URI') ) {
+		define( 'BASE_URI', '../' );
+	}
 
 	$lang = ( defined('SITE_LANG') ) ? SITE_LANG : 'en';
 
@@ -30,8 +32,8 @@ else {
 	 */
 	$header_vars = array(
 						'html_lang'		=> SITE_LANG,
-						'title'			=> $page_title . ' &raquo; ' . THIS_INSTALL_SET_TITLE,
-						'header_title'	=> THIS_INSTALL_SET_TITLE,
+						'title'			=> $page_title . ' &raquo; ' . html_output(THIS_INSTALL_SET_TITLE),
+						'header_title'	=> html_output(THIS_INSTALL_SET_TITLE),
 					);
 
 	if ( !is_projectsend_installed() ) {
@@ -42,6 +44,7 @@ else {
 	$load_scripts = array(
 						'social_login',
 						'recaptcha',
+						'chosen',
 					);
 	
 	/**
@@ -62,6 +65,8 @@ else {
 	 */
 	require_once(ROOT_DIR.'/includes/core.update.silent.php');
 }
+
+if ( !isset( $body_class ) ) { $body_class = ''; }
 ?>
 <!doctype html>
 <html lang="<?php echo $header_vars['html_lang']; ?>">
@@ -69,32 +74,36 @@ else {
 	<meta charset="utf-8">
 	<meta http-equiv="X-UA-Compatible" content="IE=edge">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
+	
+	<?php meta_noindex(); ?>
 
 	<title><?php echo html_output( $header_vars['title'] ); ?></title>
-	<link rel="shortcut icon" href="<?php echo BASE_URI; ?>favicon.ico" />
+	<?php meta_favicon(); ?>
 	<script src="<?php echo BASE_URI; ?>includes/js/jquery.1.12.4.min.js"></script>
 
-	<link rel="stylesheet" media="all" type="text/css" href="<?php echo BASE_URI; ?>assets/bootstrap/css/bootstrap.min.css" />
-
 	<!--[if lt IE 9]>
-		<script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
-		<script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+		<script src="<?php echo BASE_URI; ?>includes/js/html5shiv.min.js"></script>
+		<script src="<?php echo BASE_URI; ?>includes/js/respond.min.js"></script>
 	<![endif]-->
 
 	<?php
+		$load_theme_css = true;
 		require_once( 'assets.php' );
 
 		load_css_files();
 	?>
 </head>
 
-<body>
-	<header>
-		<div id="header" class="header_shadow">
-			<div id="lonely_logo">
-				<h1><?php echo $header_vars['header_title']; ?></h1>
+<body <?php echo add_body_class( $body_class ); ?>>
+	<div class="container-custom">
+		<header id="header" class="navbar navbar-static-top navbar-fixed-top header_unlogged">
+			<div class="navbar-header text-center">
+				<span class="navbar-brand">
+					<?php echo $header_vars['header_title']; ?>
+				</span>
 			</div>
-		</div>
-	</header>
+		</header>
 
-	<div id="main">
+		<div class="main_content_unlogged">
+			<div class="container-fluid">
+				<div class="row">

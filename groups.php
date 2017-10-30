@@ -16,7 +16,7 @@ require_once('sys.includes.php');
 
 $active_nav = 'groups';
 
-$page_title = __('Groups administration','cftp_admin');;
+$page_title = __('Groups administration','cftp_admin');
 
 /**
  * Used when viewing groups a certain client belongs to.
@@ -35,19 +35,15 @@ if(!empty($_GET['member'])) {
 		}
 		$member_exists = 1;
 
-		/** Find groups where the client is member */
-		$sql_is_member = $dbh->prepare("SELECT DISTINCT group_id FROM " . TABLE_MEMBERS . " WHERE client_id=:id");
-		$sql_is_member->bindParam(':id', $member, PDO::PARAM_INT);
-		$sql_is_member->execute();
 
-		if ( $sql_is_member->rowCount() > 0) {
-			$sql_is_member->setFetchMode(PDO::FETCH_ASSOC);
-			while ( $row_groups = $sql_is_member->fetch() ) {
-				$groups_ids[] = $row_groups["group_id"];
-			}
-			$found_groups = implode(',',$groups_ids);
-		}
-		else {
+		/** Get groups where this client is member */
+		$get_groups		= new MembersActions();
+		$get_arguments	= array(
+								'client_id'	=> $member,
+								'return'	=> 'list',
+							);
+		$found_groups	= $get_groups->client_get_groups($get_arguments); 
+		if ( empty( $found_groups ) ) {
 			$found_groups = '';
 		}
 	}
@@ -57,37 +53,9 @@ if(!empty($_GET['member'])) {
 }
 
 include('header.php');
-
-
 ?>
 
-<script type="text/javascript">
-	$(document).ready( function() {
-		$("#do_action").click(function() {
-			var checks = $("td>input:checkbox").serializeArray(); 
-			if (checks.length == 0) { 
-				alert('<?php _e('Please select at least one group to proceed.','cftp_admin'); ?>');
-				return false; 
-			}
-			else {
-				var action = $('#action').val();
-				if (action == 'delete') {
-					var msg_1 = '<?php _e("You are about to delete",'cftp_admin'); ?>';
-					var msg_2 = '<?php _e("groups. Are you sure you want to continue?",'cftp_admin'); ?>';
-					if (confirm(msg_1+' '+checks.length+' '+msg_2)) {
-						return true;
-					} else {
-						return false;
-					}
-				}
-			}
-		});
-
-	});
-</script>
-
-<div id="main">
-	<h2><?php echo $page_title; ?></h2>
+<div class="col-xs-12">
 
 <?php
 
@@ -124,7 +92,7 @@ include('header.php');
 						$new_log_action = new LogActions();
 						$log_action_args = array(
 												'action' => 18,
-												'owner_id' => $global_id,
+												'owner_id' => CURRENT_USER_ID,
 												'affected_account_name' => $all_groups[$groups]
 											);
 						$new_record_action = $new_log_action->log_action_save($log_action_args);		
@@ -277,21 +245,21 @@ include('header.php');
 				if (isset($no_results_error)) {
 					switch ($no_results_error) {
 						case 'search':
-							$no_results_message = __('Your search keywords returned no results.','cftp_admin');;
+							$no_results_message = __('Your search keywords returned no results.','cftp_admin');
 							break;
 						case 'filter':
-							$no_results_message = __('The filters you selected returned no results.','cftp_admin');;
+							$no_results_message = __('The filters you selected returned no results.','cftp_admin');
 							break;
 						case 'client_not_exists':
-							$no_results_message = __('The client does not exist.','cftp_admin');;
+							$no_results_message = __('The client does not exist.','cftp_admin');
 							break;
 						case 'is_not_member':
-							$no_results_message = __('There are no groups where this client is member.','cftp_admin');;
+							$no_results_message = __('There are no groups where this client is member.','cftp_admin');
 							break;
 					}
 				}
 				else {
-					$no_results_message = __('There are no groups created yet.','cftp_admin');;
+					$no_results_message = __('There are no groups created yet.','cftp_admin');
 				}
 				echo system_message('error',$no_results_message);
 			}
@@ -335,6 +303,11 @@ include('header.php');
 											),
 											array(
 												'sortable'		=> true,
+												'sort_url'		=> 'active',
+												'content'		=> __('Public','cftp_admin'),
+											),
+											array(
+												'sortable'		=> true,
 												'sort_url'		=> 'created_by',
 												'content'		=> __('Created by','cftp_admin'),
 												'hide'			=> 'phone',
@@ -343,6 +316,10 @@ include('header.php');
 												'sortable'		=> true,
 												'sort_url'		=> 'timestamp',
 												'content'		=> __('Added on','cftp_admin'),
+												'hide'			=> 'phone',
+											),
+											array(
+												'content'		=> __('View','cftp_admin'),
 												'hide'			=> 'phone',
 											),
 											array(
@@ -361,7 +338,19 @@ include('header.php');
 					 * 1- Get account creation date
 					 */
 					$date = date(TIMEFORMAT_USE,strtotime($row['timestamp']));
-
+					
+					/**
+					 * 2- Button class for the manage files link
+					 */
+					if ( isset( $files_amount[$row['id']] ) ) {
+						$files_link	= 'manage-files.php?group_id=' . html_output( $row["id"] );
+						$files_btn	= 'btn-primary';
+					}
+					else {
+						$files_link	= '#';
+						$files_btn	= 'btn-default disabled';
+					}
+					
 					/**
 					 * Add the cells to the row
 					 */
@@ -383,6 +372,9 @@ include('header.php');
 													'content'		=> ( isset( $files_amount[$row['id']] ) ) ? $files_amount[$row['id']] : '0',
 												),
 											array(
+													'content'		=> ( $row["public"] == '1' ) ? __('Yes','cftp_admin') : __('No','cftp_admin'),
+												),
+											array(
 													'content'		=> html_output( $row["created_by"] ),
 												),
 											array(
@@ -390,8 +382,11 @@ include('header.php');
 												),
 											array(
 													'actions'		=> true,
-													'content'		=> '<a href="manage-files.php?group_id=' . html_output( $row["id"] ) . '" class="btn btn-primary btn-sm">' . __('Manage files','cftp_admin') . '</a>' . "\n" .
-																		'<a href="groups-edit.php?id=' . html_output( $row["id"] ) . '" class="btn btn-primary btn-sm">' . __('Edit','cftp_admin') . '</a>' . "\n"
+													'content'		=> '<a href="' . $files_link . '" class="btn ' . $files_btn . ' btn-sm">' . __('Files','cftp_admin') . '</a>',
+												),
+											array(
+													'actions'		=> true,
+													'content'		=> '<a href="groups-edit.php?id=' . html_output( $row["id"] ) . '" class="btn btn-primary btn-sm"><i class="fa fa-pencil"></i><span class="button_label">' . __('Edit','cftp_admin') . '</span></a>' . "\n"
 												),
 										);
 
@@ -422,4 +417,5 @@ include('header.php');
 	
 </div>
 
-<?php include('footer.php'); ?>
+<?php
+	include('footer.php');

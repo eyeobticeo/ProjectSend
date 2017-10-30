@@ -181,15 +181,25 @@ class generateTable {
 		$continue	= ( !isset( $attributes['condition'] ) || !empty( $attributes['condition'] ) ) ? true : false;
 		
 		if ( $continue == true ) {
+			$this->attributes	= ( !empty( $attributes['attributes'] ) ) ? $attributes['attributes'] : array();
 			$this->content 		= ( !empty( $attributes['content'] ) ) ? $attributes['content'] : '';
 			$this->is_checkbox 	= ( !empty( $attributes['checkbox'] ) ) ? true : false;
 			$this->value 		= ( !empty( $attributes['value'] ) ) ? html_output( $attributes['value'] ) : null;
 			
 			if ( $this->is_checkbox == true ) {
-				$this->content = '<input type="checkbox" name="batch[]" value="' . $this->value . '" />' . "\n";
+				$this->content = '<input type="checkbox" class="batch_checkbox" name="batch[]" value="' . $this->value . '" />' . "\n";
 			}
 	
-			$this->contents .= "<td>\n" . $this->content . "</td>\n";
+			$this->contents .= "<td";
+			if ( !empty( $this->attributes ) ) {
+				foreach ( $this->attributes as $tag => $value ) {
+					if ( is_array( $value ) ) {
+						$value = implode(' ', $value);
+					}
+					$this->contents .= ' ' . $tag . '="' . $value . '"';
+				}
+			}
+			$this->contents .= ">\n" . $this->content . "</td>\n";
 		}
 	}
 
@@ -211,9 +221,22 @@ class generateTable {
 	private function construct_pagination_link( $link, $page = 1 ) {
 		$params['page'] = $page;
 	
+		/**
+		 * List of parameters to ignore when building the pagination links.
+		 * TODO: change it so it ignores all but 'search' instead? must check
+		 * if there are other parameters that need to be saved.
+		 */
+		$ignore_current_params = array(
+										'page',
+										'categories_actions',
+										'action',
+										'do_action',
+										'batch',
+									);
+									
 		if ( !empty( $_GET ) ) {
 			foreach ( $_GET as $param => $value ) {
-				if ( $param != 'page' ) {
+				if ( !in_array($param, $ignore_current_params ) ) {
 					$params[$param] = $value;
 				}
 			}
@@ -291,7 +314,7 @@ class generateTable {
 								</nav>';
 			
 			$this->output .= '<div class="form-group">
-									<label class="control-label hidden-xs hidden-sm" for="page">' . __('Go to:','cftp_admin') . '</label>
+									<label class="control-label hidden-xs hidden-sm">' . __('Go to:','cftp_admin') . '</label>
 									<input type="text" class="form-control" name="page" id="go_to_page" value="' . $params['current'] .'" />
 								</div>
 								<div class="form-group">
@@ -307,4 +330,3 @@ class generateTable {
 		return $this->output;
 	}
 }
-?>

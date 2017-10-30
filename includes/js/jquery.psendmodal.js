@@ -1,7 +1,15 @@
 // VERY Simple Modal
-
 $.fn.psendmodal = function() {
-	$('body').append('<div class="modal_overlay"></div><div class="modal_psend"><div class="modal_title"><a href="#" class="modal_close">&times;</a></div><div class="modal_content"></div></div>');
+	var modal_structure = '<div class="modal_overlay"></div>'+
+							'<div class="modal_psend">'+
+								'<div class="modal_title">'+
+									'<span>&nbsp;</span>'+
+									'<a href="#" class="modal_close">&times;</a>'+
+								'</div>'+
+								'<div class="modal_content"></div>'+
+							'</div>';
+
+	$('body').append(modal_structure);
 	show_modal();
 
 	function show_modal() {
@@ -10,10 +18,8 @@ $.fn.psendmodal = function() {
 	}
 
 	window.remove_modal = function() {
-		$('.modal_overlay').stop(true, true).fadeOut();
-		$('.modal_psend').stop(true, true).fadeOut();
-		$('.modal_overlay').remove();
-		$('.modal_psend').remove();
+		$('.modal_overlay').stop(true, true).fadeOut(500, function() { $(this).remove(); });
+		$('.modal_psend').stop(true, true).fadeOut(500, function() { $(this).remove(); });
 		return false;
 	}
 

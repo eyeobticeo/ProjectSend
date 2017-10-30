@@ -32,9 +32,7 @@ include('header.php');
 $current_level = get_current_user_level();
 ?>
 
-<div id="main">
-	<h2><?php echo $page_title; ?></h2>
-	
+<div class="col-xs-12">
 	<?php
 		/** Count the clients to show an error or the form */
 		$statement		= $dbh->query("SELECT id FROM " . TABLE_USERS . " WHERE level = '0'");
@@ -48,7 +46,7 @@ $current_level = get_current_user_level();
 	?>
 		<p>
 			<?php
-				$msg = __('Click on Add files to select all the files that you want to upload, and then click continue. On the next step, you will be able to set a name and description for each uploaded file. Remember that the maximum allowed file size (in mb.) is ','cftp_admin') . ' <strong>'.MAX_FILESIZE.'</strong>';
+				$msg = __('Click on Add files to select all the files that you want to upload, and then click continue. On the next step, you will be able to set a name and description for each uploaded file. Remember that the maximum allowed file size (in mb.) is ','cftp_admin') . ' <strong>'.UPLOAD_MAX_FILESIZE.'</strong>';
 				echo system_message('info', $msg);
 			?>
 		</p>
@@ -74,7 +72,7 @@ $current_level = get_current_user_level();
 				$("#uploader").pluploadQueue({
 					runtimes : 'html5,flash,silverlight,html4',
 					url : 'process-upload.php',
-					max_file_size : '<?php echo MAX_FILESIZE; ?>mb',
+					max_file_size : '<?php echo UPLOAD_MAX_FILESIZE; ?>mb',
 					chunk_size : '1mb',
 					multipart : true,
 					<?php
@@ -175,4 +173,3 @@ $current_level = get_current_user_level();
 
 <?php
 	include('footer.php');
-?>

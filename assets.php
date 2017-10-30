@@ -21,13 +21,15 @@ $load_js_files[]	= BASE_URI . 'assets/bootstrap/js/bootstrap.min.js';
 $load_js_files[]	= BASE_URI . 'includes/js/jquery.validations.js';
 $load_js_files[]	= BASE_URI . 'includes/js/jquery.psendmodal.js';
 $load_js_files[]	= BASE_URI . 'includes/js/jen/jen.js';
+$load_js_files[]	= BASE_URI . 'includes/js/js.cookie.js';
 $load_js_files[]	= BASE_URI . 'includes/js/main.js';
+$load_js_files[]	= BASE_URI . 'includes/js/js.functions.php';
 
 /** CSS */
 
 /** Fonts*/
 $load_css_files[]	= 'https://fonts.googleapis.com/css?family=Open+Sans:400,700,300';
-$load_css_files[]	= 'https://fonts.googleapis.com/css?family=Abel';
+$load_css_files[]	= BASE_URI . 'assets/font-awesome/css/font-awesome.min.css';
 
 /**
  * Optional scripts
@@ -46,8 +48,8 @@ if ( !empty( $load_scripts ) ) {
 				$load_js_files[]		= BASE_URI . 'includes/js/bootstrap-datepicker/js/bootstrap-datepicker.js';
 				break;
 			case 'spinedit':
-				$load_css_files[]		= BASE_URI . 'includes/js/bootstrap-spinedit/bootstrap-spinedit.css';
-				$load_js_files[]		= BASE_URI . 'includes/js/bootstrap-spinedit/bootstrap-spinedit.js';
+				$load_css_files[]		= BASE_URI . 'includes/js/bootstrap-spinedit/css/bootstrap-spinedit.css';
+				$load_js_files[]		= BASE_URI . 'includes/js/bootstrap-spinedit/js/bootstrap-spinedit.js';
 				break;
 			case 'footable':
 				$footable_js_file		= ( !empty( $footable_min ) ) ? 'footable.min.js' : 'footable.all.min.js';
@@ -63,6 +65,10 @@ if ( !empty( $load_scripts ) ) {
 				$load_css_files[]		= BASE_URI . 'includes/js/chosen/chosen.min.css';
 				$load_css_files[]		= BASE_URI . 'includes/js/chosen/chosen.bootstrap.css';
 				$load_js_files[]		= BASE_URI . 'includes/js/chosen/chosen.jquery.min.js';
+				break;
+			case 'toggle':
+				$load_css_files[]		= BASE_URI . 'includes/js/bootstrap-toggle/css/bootstrap-toggle.min.css';
+				$load_js_files[]		= BASE_URI . 'includes/js/bootstrap-toggle/js/bootstrap-toggle.min.js';
 				break;
 			case 'plupload':
 				$load_css_files[]		= BASE_URI . 'includes/plupload/js/jquery.plupload.queue/css/jquery.plupload.queue.css';
@@ -83,30 +89,31 @@ if ( !empty( $load_scripts ) ) {
 
 				break;
 			case 'flot':
-				$load_js_files[]		= BASE_URI . 'includes/flot/jquery.flot.min.js';
-				$load_js_files[]		= BASE_URI . 'includes/flot/jquery.flot.resize.min.js';
-				$load_js_files[]		= BASE_URI . 'includes/flot/jquery.flot.time.min.js';
+				$load_js_files[]		= BASE_URI . 'includes/js/flot/jquery.flot.min.js';
+				$load_js_files[]		= BASE_URI . 'includes/js/flot/jquery.flot.resize.min.js';
+				$load_js_files[]		= BASE_URI . 'includes/js/flot/jquery.flot.time.min.js';
 				$load_compat_js_files[]	= array(
-												'file'	=> BASE_URI . 'includes/flot/excanvas.js',
+												'file'	=> BASE_URI . 'includes/js/flot/excanvas.js',
 												'cond'	=> 'lt IE 9',
 											);
+				break;
+			case 'ckeditor':
+				if ( DESCRIPTIONS_USE_CKEDITOR == '1' ) {
+					$load_js_files[]		= BASE_URI . 'includes/js/ckeditor/ckeditor.js';
+				}
 				break;
 		}
 	}
 }
 
-$load_css_files[]	= BASE_URI . 'css/shared.css';
+$load_css_files[]	= BASE_URI . 'assets/bootstrap/css/bootstrap.min.css';
+$load_css_files[]	= BASE_URI . 'css/main.css';
 $load_css_files[]	= BASE_URI . 'css/mobile.css';
+
 /**
- * Load a different css file when called from the admin, or
- * the default template.
+ * Load a different css file when called from the default template.
  */
-if ( !isset( $this_template_css ) ) {
-	/** Back-end */
-	$load_css_files[]	= BASE_URI . 'css/base.css';
-}
-else {
-	/** Template */
+if ( isset( $this_template_css ) ) {
 	$load_css_files[]	= $this_template_css;
 }
 
@@ -135,6 +142,14 @@ function load_css_files() {
 }
 
 /**
+ * Custom JS.
+ */
+$custom_js_location = ROOT_DIR . '/includes/js/custom.js';
+if ( file_exists( $custom_js_location ) ) {
+	$load_js_files[]	= BASE_URI . 'includes/js/custom.js';
+}
+
+/**
  * Used before the </body> tag to print the JS files
  */
 function load_js_files() {
@@ -157,4 +172,3 @@ function load_js_files() {
 		}
 	}
 }
-?>

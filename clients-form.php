@@ -19,6 +19,7 @@
 				is_length(this.add_client_form_user,<?php echo MIN_USER_CHARS; ?>,<?php echo MAX_USER_CHARS; ?>,'<?php echo $validation_length_user; ?>');
 				is_email(this.add_client_form_email,'<?php echo $validation_invalid_mail; ?>');
 				is_alpha_or_dot(this.add_client_form_user,'<?php echo $validation_alpha_user; ?>');
+				is_number(this.add_client_form_maxfilesize,'<?php echo $validation_file_size; ?>');
 			
 			<?php
 				/**
@@ -56,6 +57,8 @@
 </script>
 
 <?php
+$current_level = get_current_user_level();
+
 $name_placeholder = __("Will be visible on the client's file list",'cftp_admin');
 
 switch ($clients_form_type) {
@@ -67,6 +70,9 @@ switch ($clients_form_type) {
 		$form_action = 'clients-add.php';
 		$info_box = true;
 		$extra_fields = true;
+		$group_field = true;
+		$group_label = __('Groups','cftp_admin');
+		$ignore_size = false;
 		break;
 	/** User is editing an existing client */
 	case 'edit_client':
@@ -76,6 +82,9 @@ switch ($clients_form_type) {
 		$form_action = 'clients-edit.php?id='.$client_id;
 		$info_box = false;
 		$extra_fields = true;
+		$group_field = true;
+		$group_label = __('Groups','cftp_admin');
+		$ignore_size = false;
 		break;
 	/** A client is creating a new account for himself */
 	case 'new_client_self':
@@ -86,6 +95,11 @@ switch ($clients_form_type) {
 		$info_box = true;
 		$extra_fields = false;
 		$name_placeholder = __("Your full name",'cftp_admin');
+		$group_field = false;
+		if ( CLIENTS_CAN_SELECT_GROUP == 'public' || CLIENTS_CAN_SELECT_GROUP == 'all' ) {
+			$group_field = true;
+			$group_label = __('Request access to groups','cftp_admin');
+		}
 		break;
 	/** A client is editing his profile */
 	case 'edit_client_self':
@@ -95,6 +109,13 @@ switch ($clients_form_type) {
 		$form_action = 'clients-edit.php?id='.$client_id;
 		$info_box = false;
 		$extra_fields = false;
+		$group_field = false;
+		if ( CLIENTS_CAN_SELECT_GROUP == 'public' || CLIENTS_CAN_SELECT_GROUP == 'all' ) {
+			$group_field			= true;
+			$group_label			= __('Request access to groups','cftp_admin');
+			$override_groups_list	= $found_requests[$client_id]['group_ids'];
+		}
+		$ignore_size = true;
 		break;
 }
 ?>
@@ -149,25 +170,118 @@ switch ($clients_form_type) {
 		</div>
 	</div>
 
-		<?php
-			if ($extra_fields == true) {
-		?>
-				<div class="form-group">
-					<label for="add_client_form_intcont" class="col-sm-4 control-label"><?php _e('Internal contact name','cftp_admin'); ?></label>
-					<div class="col-sm-8">
-						<input type="text" name="add_client_form_intcont" id="add_client_form_intcont" class="form-control" value="<?php echo (isset($add_client_data_intcont)) ? html_output(stripslashes($add_client_data_intcont)) : ''; ?>" />
-					</div>
+	<?php
+		if ($extra_fields == true) {
+	?>
+			<div class="form-group">
+				<label for="add_client_form_intcont" class="col-sm-4 control-label"><?php _e('Internal contact name','cftp_admin'); ?></label>
+				<div class="col-sm-8">
+					<input type="text" name="add_client_form_intcont" id="add_client_form_intcont" class="form-control" value="<?php echo (isset($add_client_data_intcont)) ? html_output(stripslashes($add_client_data_intcont)) : ''; ?>" />
 				</div>
-				<div class="form-group">
-					<div class="col-sm-8 col-sm-offset-4">
-						<label for="add_client_form_active">
-							<input type="checkbox" name="add_client_form_active" id="add_client_form_active" <?php echo (isset($add_client_data_active) && $add_client_data_active == 1) ? 'checked="checked"' : ''; ?>> <?php _e('Active (client can log in)','cftp_admin'); ?>
-						</label>
+			</div>
+
+			<div class="form-group">
+				<label for="add_client_form_maxfilesize" class="col-sm-4 control-label"><?php _e('Max. upload filesize','cftp_admin'); ?></label>
+				<div class="col-sm-8">
+					<div class="input-group">
+						<input type="text" name="add_client_form_maxfilesize" id="add_client_form_maxfilesize" class="form-control" value="<?php echo (isset($add_client_data_maxfilesize)) ? html_output(stripslashes($add_client_data_maxfilesize)) : ''; ?>" />
+						<span class="input-group-addon">mb</span>
 					</div>
+					<p class="field_note"><?php _e("Set to 0 to use the default system limit",'cftp_admin'); ?> (<?php echo MAX_FILESIZE; ?> mb)</p>
 				</div>
-		<?php
+			</div>
+	<?php
+		}
+	?>
+
+	<?php
+		if ( $group_field == true ) {
+			/**
+			 * Make a list of public groups in case clients can only request
+			 * membership to those
+			 */
+			$memberships	= new GroupActions;
+			$arguments		= array();
+
+			/** Groups to search on based on the current user level */
+			if ( $current_level == 9 || $current_level == 8 ) {
+				/** An admin or client manager is creating a client account */
 			}
-		?>
+			else {
+				/** Someone is registering an account for himself */
+				if ( CLIENTS_CAN_SELECT_GROUP == 'public' ) {
+					$arguments['public'] = true;
+				}
+			}
+
+			$sql_groups = $memberships->get_groups($arguments);
+			
+			$selected_groups	= ( !empty( $found_groups ) ) ? $found_groups : '';
+			$my_current_groups	= array();
+			/** Dirty and awful quick test, mark as selected the current groups which have requests for a client that's editing his own account */
+			if ( isset( $override_groups_list ) ) {
+				$selected_groups = $override_groups_list;
+				if ( !empty( $found_groups ) ) {
+					foreach ( $sql_groups as $array_key => $sql_group ) {
+						if ( in_array( $sql_group['id'], $found_groups ) ) {
+							$my_current_groups[] = $sql_group;
+							unset($sql_groups[$array_key]);
+						}
+					}
+				}
+			}
+
+			if ( count( $sql_groups ) > 0) {
+	?>
+				<div class="form-group assigns">
+					<label for="add_client_group_request" class="col-sm-4 control-label"><?php echo $group_label; ?></label>
+					<div class="col-sm-8">
+						<select multiple="multiple" name="add_client_group_request[]" id="groups-select" class="form-control chosen-select" data-placeholder="<?php _e('Select one or more options. Type to search.', 'cftp_admin');?>">
+							<?php
+								foreach ( $sql_groups as $group ) {
+							?>
+									<option value="<?php echo $group['id']; ?>"
+							<?php
+										if ( !empty( $selected_groups ) && in_array( $group['id'], $selected_groups ) ) {
+											echo ' selected="selected"';
+										}
+							?>
+									><?php echo $group['name']; ?></option>
+							<?php
+								}
+							?>
+						</select>
+						<?php
+							if ( $current_level == 9 || $current_level == 8 ) {
+						?>
+								<div class="list_mass_members">
+									<a href="#" class="btn btn-default add-all" data-type="assigns"><?php _e('Add all','cftp_admin'); ?></a>
+									<a href="#" class="btn btn-default remove-all" data-type="assigns"><?php _e('Remove all','cftp_admin'); ?></a>
+								</div>
+						<?php
+							}
+						?>
+					</div>
+				</div>
+	<?php
+			}
+		}
+	?>
+
+	<?php
+		if ($extra_fields == true) {
+	?>
+			<div class="form-group">
+				<div class="col-sm-8 col-sm-offset-4">
+					<label for="add_client_form_active">
+						<input type="checkbox" name="add_client_form_active" id="add_client_form_active" <?php echo (isset($add_client_data_active) && $add_client_data_active == 1) ? 'checked="checked"' : ''; ?>> <?php _e('Active (client can log in)','cftp_admin'); ?>
+					</label>
+				</div>
+			</div>
+	<?php
+		}
+	?>
+
 	<div class="form-group">
 		<div class="col-sm-8 col-sm-offset-4">
 			<label for="add_client_form_notify">
@@ -188,6 +302,7 @@ switch ($clients_form_type) {
 				</div>
 	<?php
 			}
+			
 		}
 	?>
 

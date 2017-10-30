@@ -50,6 +50,7 @@ if ($page_status === 1) {
 	while ( $data = $editing->fetch() ) {
 		$add_group_data_name = $data['name'];
 		$add_group_data_description = $data['description'];
+		if ($data['public'] == 1) { $add_group_data_public = 1; } else { $add_group_data_public = 0; }
 	}
 
 	/**
@@ -79,13 +80,15 @@ if ($_POST) {
 	$add_group_data_name = $_POST['add_group_form_name'];
 	$add_group_data_description = $_POST['add_group_form_description'];
 	$add_group_data_members = (!empty($_POST['add_group_form_members']) ? $_POST['add_group_form_members'] : '');
+	$add_group_data_public = (isset($_POST["add_group_form_public"])) ? 1 : 0;
 
 	/** Arguments used on validation and group creation. */
 	$edit_arguments = array(
 							'id' => $group_id,
 							'name' => $add_group_data_name,
 							'description' => $add_group_data_description,
-							'members' => $add_group_data_members
+							'members' => $add_group_data_members,
+							'public' => $add_group_data_public,
 						);
 
 	/** Validate the information from the posted form. */
@@ -95,81 +98,71 @@ if ($_POST) {
 	if ($edit_validate == 1) {
 		$edit_response = $edit_group->edit_group($edit_arguments);
 	}
+
+	$location = BASE_URI . 'groups-edit.php?id=' . $group_id . '&status=' . $edit_response['query'];
+	header("Location: $location");
+	die();
 }
 ?>
 
-<div id="main">
-	<h2><?php echo $page_title; ?></h2>
+<div class="col-xs-12 col-sm-12 col-lg-6">
+	<?php
+		if (isset($_GET['status'])) {
+			switch ($_GET['status']) {
+				case 1:
+					$msg = __('Group edited correctly.','cftp_admin');
+					echo system_message('ok',$msg);
 	
-	<div class="container">
-		<div class="row">
-			<div class="col-xs-12 col-xs-offset-0 col-sm-8 col-sm-offset-2 col-md-6 col-md-offset-3 white-box">
-				<div class="white-box-interior">
-		
-					<?php
-						/**
-						 * If the form was submited with errors, show them here.
-						 */
-						$valid_me->list_errors();
-					?>
-					
-					<?php
-						if (isset($edit_response)) {
-							/**
-							 * Get the process state and show the corresponding ok or error message.
-							 */
-							switch ($edit_response['query']) {
-								case 1:
-									$msg = __('Group edited correctly.','cftp_admin');
-									echo system_message('ok',$msg);
+					/** Record the action log */
+					$new_log_action = new LogActions();
+					$log_action_args = array(
+											'action' => 15,
+											'owner_id' => CURRENT_USER_ID,
+											'affected_account' => $group_id,
+											'affected_account_name' => $add_group_data_name
+										);
+					$new_record_action = $new_log_action->log_action_save($log_action_args);
+				break;
+				case 0:
+					$msg = __('There was an error. Please try again.','cftp_admin');
+					echo system_message('error',$msg);
+				break;
+			}
+		}
+	?>
+	
+	<div class="white-box">
+		<div class="white-box-interior">
+			<?php
+				/**
+				 * If the form was submited with errors, show them here.
+				 */
+				$valid_me->list_errors();
+			?>
 			
-									/** Record the action log */
-									$new_log_action = new LogActions();
-									$log_action_args = array(
-															'action' => 15,
-															'owner_id' => $global_id,
-															'affected_account' => $group_id,
-															'affected_account_name' => $add_group_data_name
-														);
-									$new_record_action = $new_log_action->log_action_save($log_action_args);
-								break;
-								case 0:
-									$msg = __('There was an error. Please try again.','cftp_admin');
-									echo system_message('error',$msg);
-								break;
-							}
-						}
-						else {
-						/**
-						 * If not $edit_response is set, it means we are just entering for the first time.
-						 */
-							$direct_access_error = __('This page is not intended to be accessed directly.','cftp_admin');
-							if ($page_status === 0) {
-								$msg = __('No group was selected.','cftp_admin');
-								echo system_message('error',$msg);
-								echo '<p>'.$direct_access_error.'</p>';
-							}
-							else if ($page_status === 2) {
-								$msg = __('There is no group with that ID number.','cftp_admin');
-								echo system_message('error',$msg);
-								echo '<p>'.$direct_access_error.'</p>';
-							}
-							else {
-								/**
-								 * Include the form.
-								 */
-								$groups_form_type = 'edit_group';
-								include('groups-form.php');
-							}
-						}
-					?>
-
-				</div>
-			</div>
+			<?php
+				$direct_access_error = __('This page is not intended to be accessed directly.','cftp_admin');
+				if ($page_status === 0) {
+					$msg = __('No group was selected.','cftp_admin');
+					echo system_message('error',$msg);
+					echo '<p>'.$direct_access_error.'</p>';
+				}
+				else if ($page_status === 2) {
+					$msg = __('There is no group with that ID number.','cftp_admin');
+					echo system_message('error',$msg);
+					echo '<p>'.$direct_access_error.'</p>';
+				}
+				else {
+					/**
+					 * Include the form.
+					 */
+					$groups_form_type = 'edit_group';
+					include('groups-form.php');
+				}
+			?>
 		</div>
 	</div>
 </div>
 
 <?php
 	include('footer.php');
-?>

@@ -5,9 +5,12 @@
  *
  * @package ProjectSend
  */
+define('IS_FILE_EDITOR', true);
+
 $load_scripts	= array(
 						'datepicker',
 						'chosen',
+						'ckeditor',
 					); 
 
 $allowed_levels = array(9,8,7,0);
@@ -70,9 +73,7 @@ $current_level = get_current_user_level();
 
 ?>
 
-<div id="main">
-	<h2><?php echo $page_title; ?></h2>
-
+<div class="col-xs-12">
 	<?php
 		/**
 		 * Show an error message if no ID value is passed on the URI.
@@ -115,13 +116,13 @@ $current_level = get_current_user_level();
 		if (isset($no_results_error)) {
 			switch ($no_results_error) {
 				case 'no_id_passed':
-					$no_results_message = __('Please go to the clients or groups administration page, select "Manage files" from any client and then click on "Edit" on any file to return here.','cftp_admin');;
+					$no_results_message = __('Please go to the clients or groups administration page, select "Manage files" from any client and then click on "Edit" on any file to return here.','cftp_admin');
 					break;
 				case 'id_not_exists':
-					$no_results_message = __('There is not file with that ID number.','cftp_admin');;
+					$no_results_message = __('There is not file with that ID number.','cftp_admin');
 					break;
 				case 'not_uploader':
-					$no_results_message = __("You don't have permission to edit this file.",'cftp_admin');;
+					$no_results_message = __("You don't have permission to edit this file.",'cftp_admin');
 					break;
 			}
 	?>
@@ -174,12 +175,12 @@ $current_level = get_current_user_level();
 					
 						/** Add to the database for each client / group selected */
 						$add_arguments = array(
-												'file' => $edit_file_info['url'],
-												'name' => $file['name'],
-												'description' => $file['description'],
-												'uploader' => $global_user,
-												'uploader_id' => $global_id,
-												'expiry_date' => $file['expiry_date']
+												'file_original'	=> $edit_file_info['url'],
+												'name'			=> $file['name'],
+												'description'	=> $file['description'],
+												'uploader'		=> $global_user,
+												'uploader_id'	=> CURRENT_USER_ID,
+												'expiry_date'	=> $file['expiry_date']
 											);
 					
 						/** Set notifications to YES by default */
@@ -229,7 +230,7 @@ $current_level = get_current_user_level();
 							/** CLEAN deletes the removed users/groups from the assignments table */
 							if ($clean_who == 'All') {
 								$clean_all_arguments = array(
-																'owner_id' => $global_id, /** For the log */
+																'owner_id' => CURRENT_USER_ID, /** For the log */
 																'file_id' => $this_file_id,
 																'file_name' => $file['name']
 															);
@@ -237,7 +238,7 @@ $current_level = get_current_user_level();
 							}
 							else {						
 								$clean_arguments = array (
-														'owner_id' => $global_id, /** For the log */
+														'owner_id' => CURRENT_USER_ID, /** For the log */
 														'file_id' => $this_file_id,
 														'file_name' => $file['name'],
 														'assign_to' => $clean_who,
@@ -256,7 +257,7 @@ $current_level = get_current_user_level();
 						
 						/** Uploader is a client */
 						if ($current_level == 0) {
-							$add_arguments['assign_to'] = array('c'.$global_id);
+							$add_arguments['assign_to'] = array('c'.CURRENT_USER_ID);
 							$add_arguments['hidden'] = '0';
 							$add_arguments['uploader_type'] = 'client';
 							$action_log_number = 33;
@@ -298,7 +299,7 @@ $current_level = get_current_user_level();
 							$new_log_action = new LogActions();
 							$log_action_args = array(
 													'action' => $action_log_number,
-													'owner_id' => $global_id,
+													'owner_id' => CURRENT_USER_ID,
 													'owner_user' => $global_user,
 													'affected_file' => $process_file['new_file_id'],
 													'affected_file_name' => $file['name']
@@ -352,12 +353,13 @@ $current_level = get_current_user_level();
 						$statement->bindParam(':id', $this_file_id, PDO::PARAM_INT);
 						$statement->execute();
 						while( $row = $statement->fetch() ) {
+							$file_name_title = (!empty( $row['original_url'] ) ) ? $row['original_url'] : $row['url'];
 					?>
 							<div class="file_editor <?php if ($i%2) { echo 'f_e_odd'; } ?>">
 								<div class="row">
 									<div class="col-sm-12">
 										<div class="file_number">
-											<p><span class="glyphicon glyphicon-saved" aria-hidden="true"></span><?php echo html_output($row['url']); ?></p>
+											<p><span class="glyphicon glyphicon-saved" aria-hidden="true"></span><?php echo html_output($file_name_title); ?></p>
 										</div>
 									</div>
 								</div>
@@ -377,7 +379,7 @@ $current_level = get_current_user_level();
 	
 															<div class="form-group">
 																<label><?php _e('Description', 'cftp_admin');?></label>
-																<textarea name="file[<?php echo $i; ?>][description]" class="form-control" placeholder="<?php _e('Optionally, enter here a description for the file.', 'cftp_admin');?>"><?php echo (!empty($row['description'])) ? html_output($row['description']) : ''; ?></textarea>
+																<textarea name="file[<?php echo $i; ?>][description]" class="ckeditor form-control" placeholder="<?php _e('Optionally, enter here a description for the file.', 'cftp_admin');?>"><?php echo (!empty($row['description'])) ? html_output($row['description']) : ''; ?></textarea>
 															</div>
 														</div>
 													</div>
@@ -428,6 +430,14 @@ $current_level = get_current_user_level();
 																<label for="pub_checkbox">
 																	<input type="checkbox" id="pub_checkbox" name="file[<?php echo $i; ?>][public]" value="1" <?php if ($row['public_allow']) { ?>checked="checked"<?php } ?> /> <?php _e('Allow public downloading of this file.', 'cftp_admin');?>
 																</label>
+															</div>
+
+															<div class="divider"></div>
+															<h3><?php _e('Public URL', 'cftp_admin');?></h3>
+															<div class="public_url">
+																<div class="form-group">
+																	<textarea class="form-control" readonly><?php echo BASE_URI; ?>download.php?id=<?php echo $row['id']; ?>&token=<?php echo html_output($row['public_token']); ?></textarea>
+																</div>
 															</div>
 														<?php
 															} /** Close $current_level check */
@@ -535,7 +545,7 @@ $current_level = get_current_user_level();
 					?>
 					<div class="after_form_buttons">
 						<a href="<?php echo BASE_URI; ?>manage-files.php" name="cancel" class="btn btn-default btn-wide"><?php _e('Cancel','cftp_admin'); ?></a>
-						<button type="submit" name="submit" class="btn btn-wide btn-primary"><?php _e('Continue','cftp_admin'); ?></button>
+						<button type="submit" name="submit" class="btn btn-wide btn-primary"><?php _e('Save','cftp_admin'); ?></button>
 					</div>
 				</div>
 			</form>
@@ -546,38 +556,6 @@ $current_level = get_current_user_level();
 
 <script type="text/javascript">
 	$(document).ready(function() {
-		$('.chosen-select').chosen({
-			no_results_text	: "<?php _e('No results where found.','cftp_admin'); ?>",
-			width			: "98%",
-			search_contains	: true
-		});
-
-		$('.date-container .date-field').datepicker({
-			format			: 'dd-mm-yyyy',
-			autoclose		: true,
-			todayHighlight	: true
-		});
-
-		$('.add-all').click(function(){
-			var type = $(this).data('type');
-			var selector = $(this).closest('.' + type).find('select');
-			$(selector).find('option').each(function(){
-				$(this).prop('selected', true);
-			});
-			$('select').trigger('chosen:updated');
-			return false;
-		});
-
-		$('.remove-all').click(function(){
-			var type = $(this).data('type');
-			var selector = $(this).closest('.' + type).find('select');
-			$(selector).find('option').each(function(){
-				$(this).prop('selected', false);
-			});
-			$('select').trigger('chosen:updated');
-			return false;
-		});
-
 		$("form").submit(function() {
 			clean_form(this);
 
@@ -592,4 +570,5 @@ $current_level = get_current_user_level();
 	});
 </script>
 
-<?php include('footer.php'); ?>
+<?php
+	include('footer.php');

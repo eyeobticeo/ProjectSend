@@ -18,56 +18,16 @@ check_for_session();
 
 can_see_content($allowed_levels);
 
-/** Get the default header and footer */
-include_once(ROOT_DIR.'/includes/email-template.php');
-global $email_template_header;
-global $email_template_footer;
-
 /** Get the preview type */
 $type = $_GET['t'];
 
-switch ($type) {
-	case 'client_by_user':
-			$body_text	= EMAILS_CLIENT_BY_USER_TEXT;
-		break;
-	case 'client_by_self':
-			$body_text	= EMAILS_CLIENT_BY_SELF_TEXT;
-		break;
-	case 'new_user_welcome':
-			$body_text	= EMAILS_NEW_USER_TEXT;
-		break;
-	case 'file_by_user':
-			$body_text	= EMAILS_FILE_BY_USER_TEXT;
-		break;
-	case 'file_by_client':
-			$body_text	= EMAILS_FILE_BY_CLIENT_TEXT;
-		break;
-	case 'password_reset':
-			$body_text	= EMAILS_PASS_RESET_TEXT;
-		break;
-}
-
-/**
- * Header
- */
-if (!defined('EMAILS_HEADER_FOOTER_CUSTOM') || EMAILS_HEADER_FOOTER_CUSTOM == '0') {
-	$header = $email_template_header;
-}
-else {
-	$header = EMAILS_HEADER_TEXT;
-}
-
-/**
- * Footer
- */
-if (!defined('EMAILS_HEADER_FOOTER_CUSTOM') || EMAILS_HEADER_FOOTER_CUSTOM == '0') {
-	$footer = $email_template_footer;
-}
-else {
-	$footer = EMAILS_FOOTER_TEXT;
-}
-
-echo $header . $body_text . $footer;
+/** Generate the preview using the email sending class */
+$preview = new PSend_Email();
+$preview_arguments = array(
+								'preview'	=> true,
+								'type'		=> $type,
+							);
+$preview_results = $preview->psend_send_email($preview_arguments);
+echo $preview_results;
 
 ob_end_flush();
-?>

@@ -16,6 +16,16 @@ if (!is_projectsend_installed()) {
 	exit;
 }
 
+if ( defined('SESSION_TIMEOUT_EXPIRE') && SESSION_TIMEOUT_EXPIRE == true ) {
+	if (isset($_SESSION['last_call']) && (time() - $_SESSION['last_call'] > SESSION_EXPIRE_TIME)) {
+		$logout_location = BASE_URI . 'process.php?do=logout&timeout=1';
+		header('Location: ' . $logout_location);
+		die();
+	}
+}
+$_SESSION['last_call'] = time(); // update last activity time stamp
+
+
 /**
  * Global information on the current account to use accross the system.
  */
@@ -60,6 +70,16 @@ $global_id = $global_account['id'];
 $global_name = $global_account['name'];
 
 /**
+ * Check if account has a custom value for upload max file size
+ */
+if ( $global_account['max_file_size'] == 0 || empty( $global_account['max_file_size'] ) ) {
+	define('UPLOAD_MAX_FILESIZE', MAX_FILESIZE);
+}
+else {
+	define('UPLOAD_MAX_FILESIZE', $global_account['max_file_size']);
+}
+
+/**
  * Files types limitation
  */
 $limit_files = true;
@@ -83,4 +103,3 @@ if ( $limit_files === true ) {
 else {
 	define('CAN_UPLOAD_ANY_FILE_TYPE', true);
 }
-?>

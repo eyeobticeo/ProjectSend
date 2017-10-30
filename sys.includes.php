@@ -40,8 +40,8 @@ require_once(ROOT_DIR.'/includes/updates.functions.php');
 /** Contains the session and cookies validation functions */
 require_once(ROOT_DIR.'/includes/userlevel_check.php');
 
-/** Template list generator */
-require_once(ROOT_DIR.'/includes/templates.php');
+/** Template list functions */
+require_once(ROOT_DIR.'/includes/functions.templates.php');
 
 /** Contains the current session information */
 if ( !defined( 'IS_INSTALL' ) ) {
@@ -67,6 +67,7 @@ $classes_files = array(
 						'actions-files.php',
 						'actions-categories.php',
 						'actions-groups.php',
+						'actions-members.php',
 						'actions-log.php',
 						'actions-users.php',
 						'file-upload.php',
@@ -90,5 +91,3 @@ require_once ROOT_DIR . '/includes/Google/Oauth2/service/Google_Service.php';
 require_once ROOT_DIR . '/includes/Google/Oauth2/service/Google_Model.php';
 require_once ROOT_DIR . '/includes/Google/Oauth2/contrib/Google_Oauth2Service.php';
 require_once ROOT_DIR . '/includes/Google/Oauth2/Google_Client.php';
-
-?>

@@ -1,11 +1,15 @@
 <?php
 /*
-Template name:
-PinBoxes
-
-Inspired by the awesome desing of Pinterest!
+Template name: PinBoxes
+URI: http://www.projectsend.org/templates/pinboxes
+Author: ProjectSend
+Author URI: http://www.projectsend.org/
+Author e-mail: contact@projectsend.org
+Description: Inspired by the awesome design of Pinterest!
 */
 $ld = 'pinboxes_template'; // specify the language domain for this template
+
+define('TEMPLATE_RESULTS_PER_PAGE', -1);
 
 if ( !empty( $_GET['category'] ) ) {
 	$category_filter = $_GET['category'];
@@ -23,7 +27,7 @@ $count = count($my_files);
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 		<title><?php echo html_output( $client_info['name'].' | '.$window_title . ' &raquo; ' . SYSTEM_NAME ); ?></title>
 		<link rel="stylesheet" media="all" type="text/css" href="<?php echo $this_template; ?>main.css" />
-		<link rel="shortcut icon" href="<?php echo BASE_URI; ?>favicon.ico" />
+		<?php meta_favicon(); ?>
 		<link href='<?php echo PROTOCOL; ?>://fonts.googleapis.com/css?family=Metrophobic' rel='stylesheet' type='text/css'>
 		<link rel="stylesheet" href="<?php echo $this_template; ?>/font-awesome-4.6.3/css/font-awesome.min.css">
 		
@@ -79,7 +83,7 @@ $count = count($my_files);
 		<div id="header">
 			<?php if ($logo_file_info['exists'] === true) { ?>
 				<div id="branding">
-					<img src="<?php echo TIMTHUMB_URL; ?>?src=<?php echo $logo_file_info['url']; ?>&amp;w=300" alt="<?php echo THIS_INSTALL_SET_TITLE; ?>" />
+					<img src="<?php echo TIMTHUMB_URL; ?>?src=<?php echo $logo_file_info['url']; ?>&amp;w=300" alt="<?php echo html_output(THIS_INSTALL_SET_TITLE); ?>" />
 				</div>
 			<?php } ?>
 		</div>
@@ -197,7 +201,7 @@ $count = count($my_files);
 							<div class="img_data">
 								<h2><?php echo htmlentities($file['name']); ?></h2>
 								<div class="photo_info">
-									<?php echo $file['description']; ?>
+									<?php echo htmlentities_allowed($file['description']); ?>
 									<p class="file_size">
 										<?php
 											$file_absolute_path = UPLOADED_FILES_FOLDER . $file['url'];

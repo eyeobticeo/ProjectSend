@@ -295,7 +295,7 @@ if (in_session_or_cookies($allowed_update)) {
 				 * Included inside the previous update since that is not an officially
 				 * released version.
 				 */
-				foreach ($current_tables as $working_table) {
+				foreach ($original_basic_tables as $working_table) {
 					$statement = $dbh->prepare("ALTER TABLE $working_table ENGINE = InnoDB");
 					$statement->execute();
 
@@ -589,7 +589,7 @@ if (in_session_or_cookies($allowed_update)) {
 		$new_log_action = new LogActions();
 		$log_action_args = array(
 								'action' => 30,
-								'owner_id' => $global_id,
+								'owner_id' => CURRENT_USER_ID,
 								'affected_account_name' => $current_version
 							);
 		$new_record_action = $new_log_action->log_action_save($log_action_args);
@@ -1050,7 +1050,7 @@ if (in_session_or_cookies($allowed_update)) {
 		 * Add new options that clients can set expiration date when Uploded New files 
 		 */
 		 
-			if ($last_update < 757) {
+		if ($last_update < 757) {
 			$new_database_values = array(
 											'clients_can_set_expiration_date'	=> '0'
 										);
@@ -1063,13 +1063,38 @@ if (in_session_or_cookies($allowed_update)) {
 		}
 
 		/**
-		 * r757 updates
-		 * Add new options that clients can set expiration date when Uploded New files 
+		 * r835 updates
+		 * Uploaded files now save the filename twice on the database. The original filename (to
+		 * use when downloading) and the filename on disk, so no 2 files with the same name exist.
 		 */
 		 
-			if ($last_update < 757) {
+		if ($last_update < 835) {
+			try {
+				$statement = $dbh->query("SELECT original_url FROM " . TABLE_FILES);
+			} catch( PDOException $e ) {
+				$sql1 = $dbh->query("ALTER TABLE " . TABLE_FILES . " ADD original_url TEXT NULL AFTER `url`");
+				$updates_made++;
+			}
+		}
+
+
+		/**
+		 * r837 updates
+		 * Added an option to allow groups to be public so clients can manually opt-in and out of them.
+		 * Added an option to enable or disable the use of CKEDITOR in the files descriptions.
+		 */
+		 
+		if ($last_update < 837) {
+			try {
+				$statement = $dbh->query("SELECT public FROM " . TABLE_GROUPS);
+			} catch( PDOException $e ) {
+				$sql1 = $dbh->query("ALTER TABLE " . TABLE_GROUPS . " ADD public tinyint(1) NOT NULL default '0'");
+				$updates_made++;
+			}
+
 			$new_database_values = array(
-											'custom_expiry_date'	=> '14'
+											'clients_can_select_group'			=> 'none',
+											'files_descriptions_use_ckeditor'	=> '0',
 										);
 			
 			foreach($new_database_values as $row => $value) {
@@ -1077,8 +1102,177 @@ if (in_session_or_cookies($allowed_update)) {
 					$updates_made++;
 				}
 			}
-		}	
-		
+		}
+
+		/**
+		 * r840 updates
+		 * Add a new table to handle clients requests to groups
+		 */
+		if ($last_update < 840) {
+			if ( !tableExists( TABLE_MEMBERS_REQUESTS ) ) {
+				/** Create the MEMBERS table */
+				$query = "
+				CREATE TABLE IF NOT EXISTS `".TABLE_MEMBERS_REQUESTS."` (
+				  `id` int(11) NOT NULL AUTO_INCREMENT,
+				  `timestamp` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+				  `requested_by` varchar(32) NOT NULL,
+				  `client_id` int(11) NOT NULL,
+				  `group_id` int(11) NOT NULL,
+				  PRIMARY KEY (`id`),
+				  FOREIGN KEY (`client_id`) REFERENCES ".TABLE_USERS."(`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+				  FOREIGN KEY (`group_id`) REFERENCES ".TABLE_GROUPS."(`id`) ON DELETE CASCADE ON UPDATE CASCADE
+				) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci;
+				";
+				$statement = $dbh->prepare($query);
+				$statement->execute();
+
+				$updates_made++;
+			}
+		}
+
+		/**
+		 * r841 updates
+		 * Added an option so every file can have it's landing page, even if it's not public
+		 */
+		if ($last_update < 841) {
+			$new_database_values = array(
+											'enable_landing_for_all_files'	=> '0',
+										);
+			
+			foreach($new_database_values as $row => $value) {
+				if ( add_option_if_not_exists($row, $value) ) {
+					$updates_made++;
+				}
+			}
+		}
+
+		/**
+		 * r842 updates
+		 * Added an option to set a different text on the footer
+		 */
+		if ($last_update < 842) {
+			$new_database_values = array(
+											'footer_custom_enable'	=> '0',
+											'footer_custom_content'	=> '',
+										);
+			
+			foreach($new_database_values as $row => $value) {
+				if ( add_option_if_not_exists($row, $value) ) {
+					$updates_made++;
+				}
+			}
+		}
+
+		/**
+		 * r845 updates
+		 * Add new options to customize the emails subjects sent by the system.
+		 */
+		if ($last_update < 845) {
+			$new_database_values = array(
+										/**
+										 * On or Off fields
+										 * Each one corresponding to a type of email
+										 */
+											'email_new_file_by_user_subject_customize'		=> '0',
+											'email_new_file_by_client_subject_customize'	=> '0',
+											'email_new_client_by_user_subject_customize'	=> '0',
+											'email_new_client_by_self_subject_customize'	=> '0',
+											'email_new_user_subject_customize'				=> '0',
+											'email_pass_reset_subject_customize'			=> '0',
+										/**
+										 * Text fields
+										 * Each one corresponding to a type of email
+										 */
+											'email_new_file_by_user_subject'			=> '',
+											'email_new_file_by_client_subject'			=> '',
+											'email_new_client_by_user_subject'			=> '',
+											'email_new_client_by_self_subject'			=> '',
+											'email_new_user_subject'					=> '',
+											'email_pass_reset_subject'					=> '',
+										);
+			
+			foreach($new_database_values as $row => $value) {
+				if ( add_option_if_not_exists($row, $value) ) {
+					$updates_made++;
+				}
+			}
+		}
+
+
+		/**
+		 * r859 updates
+		 * Added an option to prevent indexing by search engines
+		 */
+		if ($last_update < 859) {
+			$new_database_values = array(
+											'privacy_noindex_site'	=> '0',
+										);
+			
+			foreach($new_database_values as $row => $value) {
+				if ( add_option_if_not_exists($row, $value) ) {
+					$updates_made++;
+				}
+			}
+		}
+
+
+		/**
+		 * r882 updates
+		 * New columns where added to the users table, to
+		 * mark if a client self registered and the account
+		 * needs to be checked.
+		 */
+		if ($last_update < 882) {
+			try {
+				$statement = $dbh->query("SELECT account_requested FROM " . TABLE_USERS);
+			} catch( PDOException $e ) {
+				$statement = $dbh->query("ALTER TABLE " . TABLE_USERS . " ADD account_requested INT(1) NOT NULL default '0'");
+				$statement = $dbh->query("ALTER TABLE " . TABLE_USERS . " ADD account_denied INT(1) NOT NULL default '0'");
+				$statement = $dbh->query("ALTER TABLE " . TABLE_MEMBERS_REQUESTS . " ADD denied INT(1) NOT NULL default '0'");
+				$updates_made++;
+			}
+		}
+
+
+		/**
+		 * r885 updates
+		 * Option to set max upload filesize per user
+		 */
+		if ($last_update < 885) {
+			$statement = $dbh->query("ALTER TABLE `" . TABLE_USERS . "` ADD COLUMN `max_file_size` int(20) NOT NULL DEFAULT '0'");
+			$updates_made++;
+		}
+
+
+		/**
+		 * r950 updates
+		 * New emails for approved and denied accounts.
+		 */
+		if ($last_update < 950) {
+			$new_database_values = array(
+										/**
+										 * On or Off fields
+										 * Each one corresponding to a type of email
+										 */
+											'email_account_approve_subject_customize'		=> '0',
+											'email_account_deny_subject_customize'			=> '0',
+											'email_account_approve_customize'				=> '0',
+											'email_account_deny_customize'					=> '0',
+										/**
+										 * Text fields
+										 * Each one corresponding to a type of email
+										 */
+											'email_account_approve_subject'					=> '',
+											'email_account_deny_subject'					=> '',
+											'email_account_approve_text'					=> '',
+											'email_account_deny_text'						=> '',
+										);
+			
+			foreach($new_database_values as $row => $value) {
+				if ( add_option_if_not_exists($row, $value) ) {
+					$updates_made++;
+				}
+			}
+		}
 	}
-}	
-?>
+}
