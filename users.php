@@ -6,13 +6,8 @@
  * @subpackage	Users
  *
  */
-$footable_min = true; // delete this line after finishing pagination on every table
-$load_scripts	= array(
-						'footable',
-					); 
-
 $allowed_levels = array(9);
-require_once('sys.includes.php');
+require_once('bootstrap.php');
 
 if(!check_for_admin()) {
     return;
@@ -20,38 +15,12 @@ if(!check_for_admin()) {
 
 $active_nav = 'users';
 
-$page_title = __('Users administration','cftp_admin');;
-include('header.php');
+$page_title = __('Users administration','cftp_admin');
+
+include_once ADMIN_TEMPLATES_DIR . DS . 'header.php';
 ?>
 
-<script type="text/javascript">
-	$(document).ready( function() {
-		$("#do_action").click(function() {
-			var checks = $("td>input:checkbox").serializeArray(); 
-			if (checks.length == 0) { 
-				alert('<?php _e('Please select at least one user to proceed.','cftp_admin'); ?>');
-				return false; 
-			}
-			else {
-				var action = $('#action').val();
-				if (action == 'delete') {
-					var msg_1 = '<?php _e("You are about to delete",'cftp_admin'); ?>';
-					var msg_2 = '<?php _e("users. Are you sure you want to continue?",'cftp_admin'); ?>';
-					if (confirm(msg_1+' '+checks.length+' '+msg_2)) {
-						return true;
-					} else {
-						return false;
-					}
-				}
-			}
-		});
-
-	});
-</script>
-
-<div id="main">
-	<h2><?php echo $page_title; ?></h2>
-
+<div class="col-xs-12">
 <?php
 
 	/**
@@ -85,11 +54,11 @@ include('header.php');
 					 * Inactive users are not allowed to log in.
 					 */
 					foreach ($selected_users as $work_user) {
-						$this_user = new UserActions();
+						$this_user = new \ProjectSend\UserActions();
 						$hide_user = $this_user->change_user_active_status($work_user,'1');
 					}
 					$msg = __('The selected users were marked as active.','cftp_admin');
-					echo system_message('ok',$msg);
+					echo system_message('success',$msg);
 					$log_action_number = 27;
 					break;
 
@@ -103,19 +72,19 @@ include('header.php');
 						 * A user should not be able to deactivate himself
 						 */
 						if ($work_user != $my_info['id']) {
-							$this_user = new UserActions();
+							$this_user = new \ProjectSend\UserActions();
 							$hide_user = $this_user->change_user_active_status($work_user,'0');
 							$affected_users++;
 						}
 						else {
 							$msg = __('You cannot deactivate your own account.','cftp_admin');
-							echo system_message('error',$msg);
+							echo system_message('danger',$msg);
 						}
 					}
 
 					if ($affected_users > 0) {
 						$msg = __('The selected users were marked as inactive.','cftp_admin');
-						echo system_message('ok',$msg);
+						echo system_message('success',$msg);
 						$log_action_number = 28;
 					}
 					break;
@@ -126,19 +95,19 @@ include('header.php');
 						 * A user should not be able to delete himself
 						 */
 						if ($work_user != $my_info['id']) {
-							$this_user = new UserActions();
+							$this_user = new \ProjectSend\UserActions();
 							$delete_user = $this_user->delete_user($work_user);
 							$affected_users++;
 						}
 						else {
 							$msg = __('You cannot delete your own account.','cftp_admin');
-							echo system_message('error',$msg);
+							echo system_message('danger',$msg);
 						}
 					}
 					
 					if ($affected_users > 0) {
 						$msg = __('The selected users were deleted.','cftp_admin');
-						echo system_message('ok',$msg);
+						echo system_message('success',$msg);
 						$log_action_number = 16;
 					}
 				break;
@@ -146,18 +115,18 @@ include('header.php');
 
 			/** Record the action log */
 			foreach ($selected_users as $user) {
-				$new_log_action = new LogActions();
+				global $logger;
 				$log_action_args = array(
 										'action' => $log_action_number,
-										'owner_id' => $global_id,
+										'owner_id' => CURRENT_USER_ID,
 										'affected_account_name' => $all_users[$user]
 									);
-				$new_record_action = $new_log_action->log_action_save($log_action_args);
+				$new_record_action = $logger->add_entry($log_action_args);
 			}
 		}
 		else {
 			$msg = __('Please select at least one user.','cftp_admin');
-			echo system_message('error',$msg);
+			echo system_message('danger',$msg);
 		}
 	}
 
@@ -167,7 +136,7 @@ include('header.php');
 
 	/** Add the search terms */	
 	if ( isset( $_GET['search'] ) && !empty( $_GET['search'] ) ) {
-		$cq .= " AND (name LIKE :name OR user LIKE :user OR email LIKE :email)";
+		$cq .= " AND (name LIKE :name OR username LIKE :user OR email LIKE :email)";
 		$no_results_error = 'search';
 
 		$search_terms		= '%'.$_GET['search'].'%';
@@ -304,13 +273,13 @@ include('header.php');
 			if (!$count) {
 				switch ($no_results_error) {
 					case 'search':
-						$no_results_message = __('Your search keywords returned no results.','cftp_admin');;
+						$no_results_message = __('Your search keywords returned no results.','cftp_admin');
 						break;
 					case 'filter':
-						$no_results_message = __('The filters you selected returned no results.','cftp_admin');;
+						$no_results_message = __('The filters you selected returned no results.','cftp_admin');
 						break;
 				}
-				echo system_message('error',$no_results_message);
+				echo system_message('danger',$no_results_message);
 			}
 			
 			if ($count > 0) {
@@ -321,7 +290,7 @@ include('header.php');
 											'id'		=> 'users_tbl',
 											'class'		=> 'footable table',
 										);
-				$table = new generateTable( $table_attributes );
+				$table = new \ProjectSend\TableGenerate( $table_attributes );
 
 				$thead_columns		= array(
 											array(
@@ -338,7 +307,7 @@ include('header.php');
 											),
 											array(
 												'sortable'		=> true,
-												'sort_url'		=> 'user',
+												'sort_url'		=> 'username',
 												'content'		=> __('Log in username','cftp_admin'),
 												'hide'			=> 'phone',
 											),
@@ -358,6 +327,12 @@ include('header.php');
 												'sortable'		=> true,
 												'sort_url'		=> 'active',
 												'content'		=> __('Status','cftp_admin'),
+											),
+											array(
+												'sortable'		=> true,
+												'sort_url'		=> 'max_file_size',
+												'content'		=> __('Max. upload size','cftp_admin'),
+												'hide'			=> 'phone',
 											),
 											array(
 												'sortable'		=> true,
@@ -398,7 +373,7 @@ include('header.php');
 					/**
 					 * 3- Get account creation date
 					 */
-					$date = date( TIMEFORMAT_USE, strtotime( $row['timestamp'] ) );
+					$date = date( TIMEFORMAT, strtotime( $row['timestamp'] ) );
 
 
 					/**
@@ -419,7 +394,7 @@ include('header.php');
 													'content'		=> html_output( $row["name"] ),
 												),
 											array(
-													'content'		=> html_output( $row["user"] ),
+													'content'		=> html_output( $row["username"] ),
 												),
 											array(
 													'content'		=> html_output( $row["email"] ),
@@ -431,11 +406,14 @@ include('header.php');
 													'content'		=> '<span class="label label-' . $class . '">' . $label . '</span>',
 												),
 											array(
+													'content'		=> ( $row["max_file_size"] == '0' ) ? __('Default','cftp_admin') : $row["max_file_size"] . 'mb',
+												),
+											array(
 													'content'		=> $date,
 												),
 											array(
 													'actions'		=> true,
-													'content'		=>  '<a href="users-edit.php?id=' . html_output( $row["id"] ) . '" class="btn btn-primary btn-sm">' . __('Edit','cftp_admin') . '</a>' . "\n"
+													'content'		=>  '<a href="users-edit.php?id=' . html_output( $row["id"] ) . '" class="btn btn-primary btn-sm"><i class="fa fa-pencil"></i><span class="button_label">' . __('Edit','cftp_admin') . '</span></a>' . "\n"
 												),
 										);
 
@@ -452,7 +430,7 @@ include('header.php');
 				 * PAGINATION
 				 */
 				$pagination_args = array(
-										'link'		=> 'users.php',
+										'link'		=> basename($_SERVER['SCRIPT_FILENAME']),
 										'current'	=> $pagination_page,
 										'pages'		=> ceil( $count_for_pagination / RESULTS_PER_PAGE ),
 									);
@@ -463,4 +441,5 @@ include('header.php');
 	</form>
 </div>
 
-<?php include('footer.php'); ?>
+<?php
+	include_once ADMIN_TEMPLATES_DIR . DS . 'footer.php';

@@ -15,43 +15,22 @@
  * @package ProjectSend
  * @subpackage Upload
  */
-$load_scripts	= array(
-						'datepicker',
-						'footable',
-						'chosen',
-					); 
-
 $allowed_levels = array(9,8,7,0);
-require_once('sys.includes.php');
+require_once('bootstrap.php');
 
 $active_nav = 'files';
 
 $page_title = __('Upload files', 'cftp_admin');
-include('header.php');
+
+include_once ADMIN_TEMPLATES_DIR . DS . 'header.php';
 
 define('CAN_INCLUDE_FILES', true);
 ?>
 
-<div id="main">
-	<h2><?php echo $page_title; ?></h2>
+<div class="col-xs-12">
 
 <?php
-/**
- * Get the user level to determine if the uploader is a
- * system user or a client.
- */
-$current_level = get_current_user_level();
-
-$work_folder = UPLOADED_FILES_FOLDER;
-
-/** Coming from the web uploader */
-if(isset($_POST['finished_files'])) {
-	$uploaded_files = array_filter($_POST['finished_files']);
-}
-/** Coming from upload by FTP */
-if(isset($_POST['add'])) {
-	$uploaded_files = $_POST['add'];
-}
+$uploaded_files = $_POST['files'];
 
 /**
  * A hidden field sends the list of failed files as a string,
@@ -67,7 +46,7 @@ if(isset($_POST['upload_failed'])) {
  */
 if(isset($upload_failed_hidden_post) && count($upload_failed_hidden_post) > 0) {
 	foreach ($upload_failed_hidden_post as $failed) {
-		$delete_key = array_search($failed, $uploaded_files);					
+		$delete_key = array_search($failed, $uploaded_files);
 		unset($uploaded_files[$delete_key]);
 	}
 }
@@ -110,11 +89,11 @@ $get_categories = get_categories();
 /**
  * Make an array of file urls that are on the DB already.
  */
-$statement = $dbh->prepare("SELECT DISTINCT url FROM " . TABLE_FILES);
+$statement = $dbh->prepare("SELECT DISTINCT original_url FROM " . TABLE_FILES);
 $statement->execute();
 $statement->setFetchMode(PDO::FETCH_ASSOC);
 while( $row = $statement->fetch() ) {
-	$urls_db_files[] = $row["url"];
+	$urls_db_files[] = $row["original_url"];
 }
 
 /**
@@ -125,11 +104,10 @@ while( $row = $statement->fetch() ) {
 		/**
 		 * Get the ID of the current client that is uploading files.
 		 */
-		if ($current_level == 0) {
-			$client_my_info = get_client_by_username($global_user);
-			$client_my_id = $client_my_info["id"];
+		if (CURRENT_USER_LEVEL == 0) {
+			$client_my_id = CURRENT_USER_ID;
 		}
-		
+
 		$n = 0;
 
 		foreach ($_POST['file'] as $file) {
@@ -140,32 +118,27 @@ while( $row = $statement->fetch() ) {
 				* If the uploader is a client, set the "client" var to the current
 				* uploader username, since the "client" field is not posted.
 				*/
-				if ($current_level == 0) {
-					$file['assignments'] = 'c'.$global_user;
+				if (CURRENT_USER_LEVEL == 0) {
+					$file['assignments'] = 'c'.CURRENT_USER_USERNAME;
 				}
-				
-				$this_upload = new PSend_Upload_File();
+
+				$this_upload = new \ProjectSend\FilesUpload();
 				if (!in_array($file['file'],$urls_db_files)) {
 					$file['file'] = $this_upload->safe_rename($file['file']);
 				}
-				$location = $work_folder.'/'.$file['file'];
+				$location = UPLOADED_FILES_DIR . DS . $file['file'];
 
 				if(file_exists($location)) {
-					/**
-					 * If the file isn't already on the database, rename/chmod.
-					 */
-					if (!in_array($file['file'],$urls_db_files)) {
-						$move_arguments = array(
-												'uploaded_name' => $location,
-												'filename' => $file['file']
-											);
-						$new_filename = $this_upload->upload_move($move_arguments);
-					}
-					else {
-						$new_filename = $file['original'];
-					}
+					$move_arguments = array(
+						'uploaded_name'		=> $location,
+						'filename'			=> $file['file'],
+					);
+					$upload_move		= $this_upload->upload_move($move_arguments);
+					$new_filename		= $upload_move['filename_disk'];
+					$original_filename	= $upload_move['filename_original'];
+						
 					if (!empty($new_filename)) {
-						$delete_key = array_search($file['original'], $uploaded_files);					
+						$delete_key = array_search($file['original'], $uploaded_files);
 						unset($uploaded_files[$delete_key]);
 
 						/**
@@ -175,11 +148,12 @@ while( $row = $statement->fetch() ) {
 
 						/** Add to the database for each client / group selected */
 						$add_arguments = array(
-												'file' => $new_filename,
-												'name' => $file['name'],
-												'description' => $file['description'],
-												'uploader' => $global_user,
-												'uploader_id' => $global_id
+												'file_disk'		=> $new_filename,
+												'file_original'	=> $original_filename,
+												'name'			=> $file['name'],
+												'description'	=> $file['description'],
+												'uploader'		=> CURRENT_USER_USERNAME,
+												'uploader_id'	=> CURRENT_USER_ID,
 											);
 
 						/** Set notifications to YES by default */
@@ -189,7 +163,7 @@ while( $row = $statement->fetch() ) {
 							$add_arguments['hidden'] = $file['hidden'];
 							$send_notifications = false;
 						}
-						
+
 						if (!empty($file['assignments'])) {
 							$add_arguments['assign_to'] = $file['assignments'];
 							$assignations_count	= count($file['assignments']);
@@ -197,9 +171,9 @@ while( $row = $statement->fetch() ) {
 						else {
 							$assignations_count	= '0';
 						}
-						
+
 						/** Uploader is a client */
-						if ($current_level == 0) {
+						if (CURRENT_USER_LEVEL == 0) {
 							$add_arguments['assign_to'] = array('c'.$client_my_id);
 							$add_arguments['hidden'] = '0';
 							$add_arguments['uploader_type'] = 'client';
@@ -216,7 +190,7 @@ while( $row = $statement->fetch() ) {
 								$add_arguments['public'] = '1';
 							}
 						}
-						
+
 						if (!in_array($new_filename,$urls_db_files)) {
 							$add_arguments['add_to_db'] = true;
 						}
@@ -291,7 +265,7 @@ while( $row = $statement->fetch() ) {
 					<th data-hide="phone"><?php _e('Description','cftp_admin'); ?></th>
 					<th data-hide="phone"><?php _e('File Name','cftp_admin'); ?></th>
 					<?php
-						if ($current_level != 0) {
+						if (CURRENT_USER_LEVEL != 0) {
 					?>
 							<th data-hide="phone"><?php _e("Status",'cftp_admin'); ?></th>
 							<th data-hide="phone"><?php _e('Assignations','cftp_admin'); ?></th>
@@ -308,10 +282,10 @@ while( $row = $statement->fetch() ) {
 			?>
 					<tr>
 						<td><?php echo html_output($uploaded['name']); ?></td>
-						<td><?php echo html_output($uploaded['description']); ?></td>
+						<td><?php echo htmlentities_allowed($uploaded['description']); ?></td>
 						<td><?php echo html_output($uploaded['file']); ?></td>
 						<?php
-							if ($current_level != 0) {
+							if (CURRENT_USER_LEVEL != 0) {
 						?>
 								<td class="<?php echo (!empty($uploaded['hidden'])) ? 'file_status_hidden' : 'file_status_visible'; ?>">
 
@@ -334,7 +308,7 @@ while( $row = $statement->fetch() ) {
 									<?php
 										if ($uploaded['public'] == '1') {
 									?>
-											<a href="javascript:void(0);" class="btn btn-primary btn-sm public_link" data-id="<?php echo $uploaded['file_id']; ?>" data-token="<?php echo html_output($uploaded['public_token']); ?>" data-placement="top" data-toggle="popover" data-original-title="<?php _e('Public URL','cftp_admin'); ?>">
+											<a href="javascript:void(0);" class="btn btn-primary btn-sm public_link" data-type="file" data-id="<?php echo $uploaded['file_id']; ?>" data-token="<?php echo html_output($uploaded['public_token']); ?>">
 									<?php
 										}
 										else {
@@ -352,14 +326,16 @@ while( $row = $statement->fetch() ) {
 							}
 						?>
 						<td>
-							<a href="edit-file.php?file_id=<?php echo html_output($uploaded['new_file_id']); ?>" class="btn-primary btn btn-sm"><?php _e('Edit file','cftp_admin'); ?></a>
+							<a href="edit-file.php?file_id=<?php echo html_output($uploaded['new_file_id']); ?>" class="btn-primary btn btn-sm">
+								<i class="fa fa-pencil"></i><span class="button_label"><?php _e('Edit file','cftp_admin'); ?></span>
+							</a>
 							<?php
 								/*
 								 * Show the "My files" button only to clients
 								 */
-								if ($current_level == 0) {
+								if (CURRENT_USER_LEVEL == 0) {
 							?>
-									<a href="my_files/" class="btn-primary btn btn-sm"><?php _e('View my files','cftp_admin'); ?></a>
+									<a href="<?php echo CLIENT_VIEW_FILE_LIST_URI; ?>" class="btn-primary btn btn-sm"><?php _e('View my files','cftp_admin'); ?></a>
 							<?php
 								}
 							?>
@@ -376,13 +352,13 @@ while( $row = $statement->fetch() ) {
 	/**
 	 * Generate the table of files ready to be assigned to a client.
 	 */
-	if(!empty($uploaded_files)) {
+	if (!empty($uploaded_files)) {
 ?>
 		<h3><?php _e('Files ready to upload','cftp_admin'); ?></h3>
 		<p><?php _e('Please complete the following information to finish the uploading process. Remember that "Title" is a required field.','cftp_admin'); ?></p>
 
 		<?php
-			if ($current_level != 0) {
+			if (CURRENT_USER_LEVEL != 0) {
 		?>
 			<div class="message message_info"><strong><?php _e('Note','cftp_admin'); ?></strong>: <?php _e('You can skip assigning if you want. The files are retained and you may add them to clients or groups later.','cftp_admin'); ?></div>
 		<?php
@@ -394,7 +370,7 @@ while( $row = $statement->fetch() ) {
 		 */
 		if(!empty($empty_fields)) {
 			$msg = 'Name and client are required fields for all uploaded files.';
-			echo system_message('error',$msg);
+			echo system_message('danger',$msg);
 		}
 ?>
 
@@ -403,8 +379,8 @@ while( $row = $statement->fetch() ) {
 				$("form").submit(function() {
 					clean_form(this);
 
-					$(this).find('input[name$="[name]"]').each(function() {	
-						is_complete($(this)[0],'<?php echo $validation_no_title; ?>');
+					$(this).find('input[name$="[name]"]').each(function() {
+						is_complete($(this)[0],'<?php echo $json_strings['validation']['no_title']; ?>');
 					});
 
 					// show the errors or continue if everything is ok
@@ -417,20 +393,21 @@ while( $row = $statement->fetch() ) {
 		<form action="upload-process-form.php" name="save_files" id="save_files" method="post">
 			<?php
 				foreach($uploaded_files as $add_uploaded_field) {
-					echo '<input type="hidden" name="finished_files[]" value="'.$add_uploaded_field.'" />
-					';
+			?>
+					<input type="hidden" name="files[]" value="<?php echo $add_uploaded_field; ?>" />
+			<?php
 				}
 			?>
-			
+
 			<div class="container-fluid">
 				<?php
 					$i = 1;
 					foreach ($uploaded_files as $file) {
 						clearstatcache();
-						$this_upload = new PSend_Upload_File();
+                        $this_upload = new \ProjectSend\FilesUpload();
 						$file_original = $file;
 
-						$location = $work_folder.'/'.$file;
+						$location = UPLOADED_FILES_DIR . DS . $file;
 
 						/**
 						 * Check that the file is indeed present on the folder.
@@ -444,7 +421,7 @@ while( $row = $statement->fetch() ) {
 							 * underscore with a space to generate a valid upload name.
 							 */
 							$filename_no_ext = substr($file, 0, strrpos($file, '.'));
-							$file_title = str_replace('_',' ',$filename_no_ext);
+                            $file_title = str_replace('_',' ',$filename_no_ext);
 							if ($this_upload->is_filetype_allowed($file)) {
 								if (in_array($file,$urls_db_files)) {
 									$statement = $dbh->prepare("SELECT filename, description FROM " . TABLE_FILES . " WHERE url = :url");
@@ -468,33 +445,33 @@ while( $row = $statement->fetch() ) {
 									<div class="row edit_files">
 										<div class="col-sm-12">
 											<div class="row edit_files_blocks">
-												<div class="<?php echo ($global_level != 0 || CLIENTS_CAN_SET_EXPIRATION_DATE == '1' ) ? 'col-sm-6 col-md-3' : 'col-sm-12 col-md-12'; ?> column">
+												<div class="<?php echo (CURRENT_USER_LEVEL != 0 || CLIENTS_CAN_SET_EXPIRATION_DATE == '1' ) ? 'col-sm-6 col-md-3' : 'col-sm-12 col-md-12'; ?> column">
 													<div class="file_data">
 														<div class="row">
 															<div class="col-sm-12">
 																<h3><?php _e('File information', 'cftp_admin');?></h3>
 																<input type="hidden" name="file[<?php echo $i; ?>][original]" value="<?php echo html_output($file_original); ?>" />
 																<input type="hidden" name="file[<?php echo $i; ?>][file]" value="<?php echo html_output($file); ?>" />
-		
+
 																<div class="form-group">
 																	<label><?php _e('Title', 'cftp_admin');?></label>
 																	<input type="text" name="file[<?php echo $i; ?>][name]" value="<?php echo html_output($file_title); ?>" class="form-control file_title" placeholder="<?php _e('Enter here the required file title.', 'cftp_admin');?>" />
 																</div>
-																
+
 																<div class="form-group">
 																	<label><?php _e('Description', 'cftp_admin');?></label>
-																	<textarea name="file[<?php echo $i; ?>][description]" class="form-control" placeholder="<?php _e('Optionally, enter here a description for the file.', 'cftp_admin');?>"><?php echo (isset($description)) ? html_output($description) : ''; ?></textarea>
+																	<textarea name="file[<?php echo $i; ?>][description]" class="<?php if ( FILES_DESCRIPTIONS_USE_CKEDITOR == 1 ) { echo 'ckeditor'; } ?> form-control" placeholder="<?php _e('Optionally, enter here a description for the file.', 'cftp_admin');?>"><?php echo (isset($description)) ? html_output($description) : ''; ?></textarea>
 																</div>
-																
+
 															</div>
 														</div>
 													</div>
 												</div>
-												
+
 												<?php
 													/** The following options are available to users or client if clients_can_set_expiration_date set. */
-													if ($global_level != 0 || CLIENTS_CAN_SET_EXPIRATION_DATE == '1' ) {
-												?>											
+													if (CURRENT_USER_LEVEL != 0 || CLIENTS_CAN_SET_EXPIRATION_DATE == '1' ) {
+												?>
 													<div class="col-sm-6 col-md-3 column_even column">
 														<div class="file_data">
 															<?php
@@ -504,11 +481,11 @@ while( $row = $statement->fetch() ) {
 																*/
 															?>
 															<h3><?php _e('Expiration date', 'cftp_admin');?></h3>
-															
+
 															<div class="form-group">
 																<label for="file[<?php echo $i; ?>][expires_date]"><?php _e('Select a date', 'cftp_admin');?></label>
 																	<div class="input-group date-container">
-																		<input type="text" class="date-field form-control datapick-field" readonly id="file[<?php echo $i; ?>][expiry_date]" name="file[<?php echo $i; ?>][expiry_date]" value="<?php echo (!empty($expiry_date)) ? $expiry_date : date('d-m-Y', strtotime( "$dt +" . CUSTOM_EXPIRY_DATE . " day" )); ?>" />
+																		<input type="text" class="date-field form-control datapick-field" readonly id="file[<?php echo $i; ?>][expiry_date]" name="file[<?php echo $i; ?>][expiry_date]" value="<?php echo (!empty($expiry_date)) ? $expiry_date : date('d-m-Y'); ?>" />
 																		<div class="input-group-addon">
 																			<i class="glyphicon glyphicon-time"></i>
 																		</div>
@@ -520,33 +497,33 @@ while( $row = $statement->fetch() ) {
 																	<input type="checkbox" name="file[<?php echo $i; ?>][expires]" id="exp_checkbox_<?php echo $i; ?>" value="1" <?php if ($row['expiry_set']) { ?>checked="checked"<?php } ?> /> <?php _e('File expires', 'cftp_admin');?>
 																</label>
 															</div>
-			
+
 															<?php
 																/** The following options are available to users only */
-																if ($global_level != 0) {
+																if (CURRENT_USER_LEVEL != 0) {
 															?>
-			
+
 																<div class="divider"></div>
-					
+
 																<h3><?php _e('Public downloading', 'cftp_admin');?></h3>
-																
+
 																<div class="checkbox">
 																	<label for="pub_checkbox_<?php echo $i; ?>">
 																		<input type="checkbox" id="pub_checkbox_<?php echo $i; ?>" name="file[<?php echo $i; ?>][public]" value="1" /> <?php _e('Allow public downloading of this file.', 'cftp_admin');?>
 																	</label>
 																</div>
 														<?php
-															} /** Close $current_level check */
+															} /** Close CURRENT_USER_LEVEL check */
 														?>
 														</div>
 													</div>
 												<?php
-													} /** Close $current_level check */
+													} /** Close CURRENT_USER_LEVEL check */
 												?>
-												
+
 												<?php
 													/** The following options are available to users only */
-													if ($global_level != 0) {
+													if (CURRENT_USER_LEVEL != 0) {
 												?>
 														<div class="col-sm-6 col-md-3 assigns column">
 															<div class="file_data">
@@ -591,9 +568,9 @@ while( $row = $statement->fetch() ) {
 																	<a href="#" class="btn btn-xs btn-primary remove-all" data-type="assigns"><?php _e('Remove all','cftp_admin'); ?></a>
 																	<a href="#" class="btn btn-xs btn-danger copy-all" data-type="assigns"><?php _e('Copy selections to other files','cftp_admin'); ?></a>
 																</div>
-	
+
 																<div class="divider"></div>
-					
+
 																<div class="checkbox">
 																	<label for="hid_checkbox_<?php echo $i; ?>">
 																		<input type="checkbox" id="hid_checkbox_<?php echo $i; ?>" name="file[<?php echo $i; ?>][hidden]" value="1" /> <?php _e('Upload hidden (will not send notifications)', 'cftp_admin');?>
@@ -623,7 +600,7 @@ while( $row = $statement->fetch() ) {
 															</div>
 														</div>
 													<?php
-														} /** Close $current_level check */
+														} /** Close CURRENT_USER_LEVEL check */
 													?>
 											</div>
 										</div>
@@ -650,9 +627,9 @@ while( $row = $statement->fetch() ) {
 				$upload_failed_hidden = implode(',',$upload_failed);
 			?>
 			<input type="hidden" name="upload_failed" value="<?php echo $upload_failed_hidden; ?>" />
-			
+
 			<div class="after_form_buttons">
-				<button type="submit" name="submit" class="btn btn-wide btn-primary" id="upload-continue"><?php _e('Continue','cftp_admin'); ?></button>
+				<button type="submit" name="submit" class="btn btn-wide btn-primary" id="upload-continue"><?php _e('Save','cftp_admin'); ?></button>
 			</div>
 		</form>
 
@@ -663,9 +640,9 @@ while( $row = $statement->fetch() ) {
 	 * Send the notifications
 	 */
 	else {
-		include(ROOT_DIR.'/upload-send-notifications.php');
+		include_once INCLUDES_DIR . DS . 'notifications.uploads.php';
 	}
-		
+
 	/**
 	 * Generate the table for the failed files.
 	 */
@@ -701,48 +678,16 @@ while( $row = $statement->fetch() ) {
 		<?php
 			if(!empty($uploaded_files)) {
 		?>
-				$('.chosen-select').chosen({
-					no_results_text	: "<?php _e('No results where found.','cftp_admin'); ?>",
-					width			: "98%",
-					search_contains	: true
-				});
-
-				$('.date-container .date-field').datepicker({
-					format			: 'dd-mm-yyyy',
-					autoclose		: true,
-					todayHighlight	: true
-				});
-
-				$('.add-all').click(function(){
-					var type = $(this).data('type');
-					var selector = $(this).closest('.' + type).find('select');
-					$(selector).find('option').each(function(){
-						$(this).prop('selected', true);
-					});
-					$('select').trigger('chosen:updated');
-					return false;
-				});
-		
-				$('.remove-all').click(function(){
-					var type = $(this).data('type');
-					var selector = $(this).closest('.' + type).find('select');
-					$(selector).find('option').each(function(){
-						$(this).prop('selected', false);
-					});
-					$('select').trigger('chosen:updated');
-					return false;
-				});
-
 				$('.copy-all').click(function() {
 					if ( confirm( "<?php _e('Copy selection to all files?','cftp_admin'); ?>" ) ) {
 						var type = $(this).data('type');
 						var selector = $(this).closest('.' + type).find('select');
-	
+
 						var selected = new Array();
 						$(selector).find('option:selected').each(function() {
 							selected.push($(this).val());
 						});
-	
+
 						$('.' + type + ' .chosen-select').each(function() {
 							$(this).find('option').each(function() {
 								if ($.inArray($(this).val(), selected) === -1) {
@@ -758,38 +703,14 @@ while( $row = $statement->fetch() ) {
 
 					return false;
 				});
-		
+
 				// Autoclick the continue button
 				//$('#upload-continue').click();
 		<?php
 			}
 		?>
-
-		$('.public_link').popover({ 
-			html : true,
-			content: function() {
-				var id		= $(this).data('id');
-				var token	= $(this).data('token');
-				return '<strong><?php _e('Click to select','cftp_admin'); ?></strong><textarea class="input-large public_link_copy" rows="4"><?php echo BASE_URI; ?>download.php?id=' + id + '&token=' + token + '</textarea><small><?php _e('Send this URL to someone to download the file without registering or logging in.','cftp_admin'); ?></small><div class="close-popover"><button type="button" class="btn btn-inverse btn-sm"><?php _e('Close','cftp_admin'); ?></button></div>';
-			}
-		});
-
-		$(".col_visibility").on('click', '.close-popover button', function(e) {
-			var popped = $(this).parents('.col_visibility').find('.public_link');
-			popped.popover('hide');
-		});
-
-		$(".col_visibility").on('click', '.public_link_copy', function(e) {
-			$(this).select();
-			$(this).mouseup(function() {
-				$(this).unbind("mouseup");
-				return false;
-			});
-		});
-
 	});
 </script>
 
 <?php
-	include('footer.php');
-?>
+	include_once ADMIN_TEMPLATES_DIR . DS . 'footer.php';

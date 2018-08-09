@@ -6,67 +6,18 @@
  * @subpackage	Log
  *
  */
-$footable_min = true; // delete this line after finishing pagination on every table
-$load_scripts	= array(
-						'footable',
-					); 
-
 $allowed_levels = array(9);
-require_once('sys.includes.php');
+require_once('bootstrap.php');
+
+$active_nav = 'tools';
+
 $page_title = __('Recent activities log','cftp_admin');
 
-include('header.php');
+include_once ADMIN_TEMPLATES_DIR . DS . 'header.php';
 ?>
 
-<script type="text/javascript">
-	$(document).ready( function() {
-		$("#do_action").click(function() {
-			var checks = $("td>input:checkbox").serializeArray(); 
-			var action = $('#action').val();
-
-			if (action == 'delete') {
-				if (checks.length == 0) { 
-					alert('<?php _e('Please select at least one activity to proceed.','cftp_admin'); ?>');
-					return false; 
-				}
-				else {
-					var msg_1 = '<?php _e("You are about to delete",'cftp_admin'); ?>';
-					var msg_2 = '<?php _e("activities. Are you sure you want to continue?",'cftp_admin'); ?>';
-					if (confirm(msg_1+' '+checks.length+' '+msg_2)) {
-						return true;
-					} else {
-						return false;
-					}
-				}
-			}
-			if (action == 'clear') {
-				var msg = '<?php _e("You are about to delete all activities from the log. Only those used for statistics will remain. Are you sure you want to continue?",'cftp_admin'); ?>';
-				if (confirm(msg)) {
-					return true;
-				} else {
-					return false;
-				}
-			}
-
-			if (action == 'download') {
-				$(document).psendmodal();
-				$('.modal_content').html('<p class="loading-img">'+
-											'<img src="<?php echo BASE_URI; ?>img/ajax-loader.gif" alt="Loading" /></p>'+
-											'<p class="lead text-center text-info"><?php _e('Please wait while your download is prepared.','cftp_admin'); ?></p>'
-										);
-				$('.modal_content').append('<iframe src="<?php echo BASE_URI; ?>includes/actions.log.export.php?format=csv"></iframe>');
-				return false;
-			}
-		});
-
-	});
-</script>
-
-<div id="main">
-	<h2><?php echo $page_title; ?></h2>
-
+<div class="col-xs-12">
 <?php
-
 	/**
 	 * Apply the corresponding action to the selected users.
 	 */
@@ -79,30 +30,30 @@ include('header.php');
 					$delete_ids = implode( ',', $selected_actions );
 
 					if ( !empty( $_GET['batch'] ) ) {
-							$statement = $dbh->prepare("DELETE FROM " . TABLE_LOG . " WHERE FIND_IN_SET(id, :delete)");
+							$statement = $dbh->prepare("DELETE FROM " . TABLE_ACTIONS_LOG . " WHERE FIND_IN_SET(id, :delete)");
 							$params = array(
 											':delete'	=> $delete_ids,
 										);
 							$statement->execute( $params );
 						
 							$msg = __('The selected activities were deleted.','cftp_admin');
-							echo system_message('ok',$msg);
+							echo system_message('success',$msg);
 					}
 					else {
 						$msg = __('Please select at least one activity.','cftp_admin');
-						echo system_message('error',$msg);
+						echo system_message('danger',$msg);
 					}
 				break;
-				case 'clear':
+				case 'log_clear':
 					$keep = '5,8,9';
-					$statement = $dbh->prepare("DELETE FROM " . TABLE_LOG . " WHERE NOT ( FIND_IN_SET(action, :keep) ) ");
+					$statement = $dbh->prepare("DELETE FROM " . TABLE_ACTIONS_LOG . " WHERE NOT ( FIND_IN_SET(action, :keep) ) ");
 					$params = array(
 									':keep'	=> $keep,
 								);
 					$statement->execute( $params );
 
 					$msg = __('The log was cleared. Only data used for statistics remained. You can delete them manually if you want.','cftp_admin');
-					echo system_message('ok',$msg);
+					echo system_message('success',$msg);
 				break;
 			}
 	}
@@ -112,7 +63,7 @@ include('header.php');
 	/**
 	 * Get the actually requested items
 	 */
-	$cq = "SELECT * FROM " . TABLE_LOG;
+	$cq = "SELECT * FROM " . TABLE_ACTIONS_LOG;
 
 	/** Add the search terms */	
 	if ( isset($_GET['search']) && !empty($_GET['search'] ) ) {
@@ -143,7 +94,7 @@ include('header.php');
 	 * Add the order.
 	 * Defaults to order by: id, order: DESC
 	 */
-	$cq .= sql_add_order( TABLE_LOG, 'id', 'DESC' );
+	$cq .= sql_add_order( TABLE_ACTIONS_LOG, 'id', 'DESC' );
 
 	/**
 	 * Pre-query to count the total results
@@ -200,10 +151,19 @@ include('header.php');
 					<div class="form-group group_float">
 						<label class="control-label hidden-xs hidden-sm"><i class="glyphicon glyphicon-check"></i> <?php _e('Activities actions','cftp_admin'); ?>:</label>
 						<select name="action" id="action" class="form-control">
-							<option value="none"><?php _e('Select action','cftp_admin'); ?></option>
-							<option value="download"><?php _e('Download as csv','cftp_admin'); ?></option>
-							<option value="delete"><?php _e('Delete selected','cftp_admin'); ?></option>
-							<option value="clear"><?php _e('Clear entire log','cftp_admin'); ?></option>
+								<?php
+								$actions_options = array(
+														'none'				=> __('Select action','cftp_admin'),
+														'log_download'		=> __('Download as csv','cftp_admin'),
+														'delete'			=> __('Delete selected','cftp_admin'),
+														'log_clear'			=> __('Clear entire log','cftp_admin'),
+													);
+								foreach ( $actions_options as $val => $text ) {
+							?>
+									<option value="<?php echo $val; ?>"><?php echo $text; ?></option>
+							<?php
+								}
+							?>
 						</select>
 					</div>
 					<button type="submit" id="do_action" class="btn btn-sm btn-default"><?php _e('Proceed','cftp_admin'); ?></button>
@@ -223,14 +183,14 @@ include('header.php');
 				if (isset($no_results_error)) {
 					switch ($no_results_error) {
 						case 'filter':
-							$no_results_message = __('The filters you selected returned no results.','cftp_admin');;
+							$no_results_message = __('The filters you selected returned no results.','cftp_admin');
 							break;
 					}
 				}
 				else {
-					$no_results_message = __('There are no activities recorded.','cftp_admin');;
+					$no_results_message = __('There are no activities recorded.','cftp_admin');
 				}
-				echo system_message('error',$no_results_message);
+				echo system_message('danger',$no_results_message);
 			}
 		?>
 
@@ -242,7 +202,7 @@ include('header.php');
 										'id'		=> 'activities_tbl',
 										'class'		=> 'footable table',
 									);
-			$table = new generateTable( $table_attributes );
+			$table = new \ProjectSend\TableGenerate( $table_attributes );
 
 			$thead_columns		= array(
 										array(
@@ -298,7 +258,7 @@ include('header.php');
 										'affected_account_name'	=> $log['affected_account_name']
 									)
 				);
-				$date = date(TIMEFORMAT_USE,strtotime($log['timestamp']));
+				$date = date(TIMEFORMAT,strtotime($log['timestamp']));
 
 				$table->add_row();
 				
@@ -340,7 +300,7 @@ include('header.php');
 			 * PAGINATION
 			 */
 			$pagination_args = array(
-									'link'		=> 'actions-log.php',
+									'link'		=> basename($_SERVER['SCRIPT_FILENAME']),
 									'current'	=> $pagination_page,
 									'pages'		=> ceil( $count_for_pagination / RESULTS_PER_PAGE_LOG ),
 								);
@@ -351,4 +311,5 @@ include('header.php');
 	
 </div>
 
-<?php include('footer.php'); ?>
+<?php
+	include_once ADMIN_TEMPLATES_DIR . DS . 'footer.php';

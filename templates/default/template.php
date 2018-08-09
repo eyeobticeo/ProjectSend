@@ -1,39 +1,33 @@
 <?php
 /*
-Template name:
-Default
+Template name: Default
+URI: http://www.projectsend.org/templates/default
+Author: ProjectSend
+Author URI: http://www.projectsend.org/
+Author e-mail: contact@projectsend.org
+Description: The default template uses the same style as the system backend, allowing for a seamless user experience
 */
 
 $ld = 'cftp_template'; // specify the language domain for this template
 
-if ( !empty( $_GET['category'] ) ) {
-	$category_filter = $_GET['category'];
-}
+define('TEMPLATE_RESULTS_PER_PAGE', 10);
 
-include_once(ROOT_DIR.'/templates/common.php'); // include the required functions for every template
+include_once(TEMPLATES_DIR.'/common.php'); // include the required functions for every template
 
-$window_title = __('File downloads','cftp_template');
+$page_title = __('File downloads','cftp_template');
 
-$load_scripts	= array(
-						'footable',
-					); 
+$body_class = array('template', 'default-template', 'hide_title');
 
-include_once(ROOT_DIR.'/header.php');
+include_once(ADMIN_TEMPLATES_DIR.'/header.php');
 
-$count = count($my_files);
+define('TEMPLATE_THUMBNAILS_WIDTH', '50');
+define('TEMPLATE_THUMBNAILS_HEIGHT', '50');
 ?>
 
+<div class="col-xs-12">
 	<div id="wrapper">
-		<div id="left_column">
-			<?php if ($logo_file_info['exists'] === true) { ?>
-				<div id="current_logo">
-					<img src="<?php echo TIMTHUMB_URL; ?>?src=<?php echo $logo_file_info['url']; ?>&amp;w=250" alt="<?php echo THIS_INSTALL_SET_TITLE; ?>" />
-				</div>
-			<?php } ?>
-		</div>
-	
 		<div id="right_column">
-	
+
 			<div class="form_actions_left">
 				<div class="form_actions_limit_results">
 					<?php show_search_form(); ?>
@@ -59,7 +53,7 @@ $count = count($my_files);
 					?>
 				</div>
 			</div>
-		
+
 			<form action="" name="files_list" method="get" class="form-inline">
 				<?php form_add_existing_parameters(); ?>
 				<div class="form_actions_right">
@@ -68,236 +62,267 @@ $count = count($my_files);
 							<div class="form-group group_float">
 								<label class="control-label hidden-xs hidden-sm"><i class="glyphicon glyphicon-check"></i> <?php _e('Selected files actions','cftp_admin'); ?>:</label>
 								<select name="action" id="action" class="txtfield form-control">
-									<option value="zip"><?php _e('Download zipped','cftp_admin'); ?></option>
+									<?php
+										$actions_options = array(
+																'none'	=> __('Select action','cftp_admin'),
+																'zip'	=> __('Download zipped','cftp_admin'),
+															);
+										foreach ( $actions_options as $val => $text ) {
+									?>
+											<option value="<?php echo $val; ?>"><?php echo $text; ?></option>
+									<?php
+										}
+									?>
 								</select>
 							</div>
 							<button type="submit" id="do_action" class="btn btn-sm btn-default"><?php _e('Proceed','cftp_admin'); ?></button>
 						</div>
 					</div>
 				</div>
-		
+
 				<div class="right_clear"></div><br />
 
 				<div class="form_actions_count">
-					<p class="form_count_total"><?php _e('Found','cftp_admin'); ?>: <span><?php echo $count; ?> <?php _e('files','cftp_admin'); ?></span></p>
+					<p class="form_count_total"><?php _e('Found','cftp_admin'); ?>: <span><?php echo $count_for_pagination; ?> <?php _e('files','cftp_admin'); ?></span></p>
 				</div>
-	
+
 				<div class="right_clear"></div>
-	
+
 				<?php
-					if (!$count) {
+					if (!$count_for_pagination) {
 						if (isset($no_results_error)) {
 							switch ($no_results_error) {
 								case 'search':
-									$no_results_message = __('Your search keywords returned no results.','cftp_admin');;
+									$no_results_message = __('Your search keywords returned no results.','cftp_admin');
 									break;
 							}
 						}
 						else {
-							$no_results_message = __('There are no files available.','cftp_template');;
+							$no_results_message = __('There are no files available.','cftp_template');
 						}
-						echo system_message('error',$no_results_message);
+						echo system_message('danger',$no_results_message);
 					}
-				?>
-		
-				<table id="files_list" class="footable" data-page-size="<?php echo FOOTABLE_PAGING_NUMBER; ?>">
-					<thead>
-						<tr>
-							<th class="td_checkbox" data-sort-ignore="true">
-								<input type="checkbox" name="select_all" id="select_all" value="0" />
-							</th>
-							<th><?php _e('Title','cftp_template'); ?></th>
-							<th data-hide="phone"><?php _e('Ext.','cftp_admin'); ?></th>
-							<th data-hide="phone" class="description"><?php _e('Description','cftp_template'); ?></th>
-							<th data-hide="phone"><?php _e('Size','cftp_template'); ?></th>
-							<th data-type="numeric" data-sort-initial="descending"><?php _e('Date','cftp_template'); ?></th>
-							<th data-hide="phone" data-sort-ignore="true"><?php _e('Expiration date','cftp_template'); ?></th>
-							<th data-hide="phone,tablet" data-sort-ignore="true"><?php _e('Image preview','cftp_template'); ?></th>
-							<th data-hide="phone" data-sort-ignore="true"><?php _e('Download','cftp_template'); ?></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php
-							if ($count > 0) {
-								foreach ($my_files as $file) {
-									$download_link = make_download_link($file);
-									$date = date(TIMEFORMAT_USE,strtotime($file['timestamp']));
-						?>
-									<tr>
-										<td>
-											<?php
-												if ($file['expired'] == false) {
-											?>
-													<input type="checkbox" name="files[]" value="<?php echo $file["id"]; ?>" />
-											<?php
-												}
-											?>
-										</td>
-										<td class="file_name">
-											<?php
-												if ($file['expired'] == true) {
-											?>
-													<strong><?php echo htmlentities($file['name']); ?></strong>
-											<?php
-												}
-												else {
-											?>
-													<a href="<?php echo $download_link; ?>" target="_blank">
-														<strong><?php echo htmlentities($file['name']); ?></strong>
-													</a>
-											<?php
-												}
-											?>
-										</td>
-										<td class="extra">
-											<span class="label label-success label_big">
-												<?php		
-													$pathinfo = pathinfo($file['url']);	
-													$extension = strtolower($pathinfo['extension']);					
-													echo $extension;
-												?>
-											</span>
-										</td>
-										<td class="description"><?php echo htmlentities($file['description']); ?></td>
-										<td>
-											<?php
-												$file_absolute_path = UPLOADED_FILES_FOLDER . $file['url'];
-												if ( file_exists( $file_absolute_path ) ) {
-													$this_file_size = get_real_size(UPLOADED_FILES_FOLDER.$file['url']);
-													echo format_file_size($this_file_size);
-												}
-												else {
-													echo '-';
-												}
-											?>
-										</td>
-										<td data-value="<?php echo strtotime($file['timestamp']); ?>">
-											<?php echo $date; ?>
-										</td>
-										<td>
-											<?php
-												if ( $file['expires'] == '1' ) {
-													if ( $file['expired'] == false ) {
-														$class = 'primary';
-													} else {
-														$class = 'danger';
-													}
-													
-													$value = date( TIMEFORMAT_USE, strtotime( $file['expiry_date'] ) );
-												} else {
-													$class = 'success';
-													$value = __('Never','cftp_template');
-												}
-											?>
-											<span class="label label-<?php echo $class; ?> label_big">
-												<?php echo $value; ?>
-											</span>
-										</td>
-										<?php
-											if ($file['expired'] == true) {
-										?>
-											<td class="extra"></td>
-											<td class="text-center">
-												<a href="javascript:void(0);" class="btn btn-danger disabled btn-sm">
-													<?php _e('File expired','cftp_template'); ?>
-												</a>
-											</td>
-										<?php
-											}
-											else {
-										?>
-												<td class="extra">
-													<?php
-														if (
-															$extension == "gif" ||
-															$extension == "jpg" ||
-															$extension == "pjpeg" ||
-															$extension == "jpeg" ||
-															$extension == "png"
-														) {
-															if ( file_exists( $file_absolute_path ) ) {
-																$this_thumbnail_url = UPLOADED_FILES_URL.$file['url'];
-																if (THUMBS_USE_ABSOLUTE == '1') {
-																	$this_thumbnail_url = BASE_URI.$this_thumbnail_url;
-																}
-													?>
-																<img src="<?php echo TIMTHUMB_URL; ?>?src=<?php echo $this_thumbnail_url; ?>&amp;w=<?php echo THUMBS_MAX_WIDTH; ?>&amp;q=<?php echo THUMBS_QUALITY; ?>" class="thumbnail" alt="<?php echo htmlentities($this_file['name']); ?>" />
-													<?php
-															}
-														}
-													?>
-												</td>
-												<td>
-													<a href="<?php echo $download_link; ?>" target="_blank" class="btn btn-primary btn-sm btn-wide">
-														<?php _e('Download','cftp_template'); ?>
-													</a>
-												</td>
-										<?php
-											}
-										?>
-									</tr>
-						<?php
+
+
+					if ($count > 0) {
+						/**
+						 * Generate the table using the class.
+						 */
+						$table_attributes	= array(
+													'id'		=> 'files_list',
+													'class'		=> 'footable table',
+												);
+						$table = new \ProjectSend\TableGenerate( $table_attributes );
+
+						$thead_columns		= array(
+													array(
+														'select_all'	=> true,
+														'attributes'	=> array(
+																				'class'		=> array( 'td_checkbox' ),
+																			),
+													),
+													array(
+														'content'		=> __('Thumbnail','cftp_admin'),
+														'hide'			=> 'phone,tablet',
+													),
+													array(
+														'sortable'		=> true,
+														'sort_url'		=> 'filename',
+														'content'		=> __('Title','cftp_admin'),
+													),
+													array(
+														'content'		=> __('Type','cftp_admin'),
+														'hide'			=> 'phone',
+													),
+													array(
+														'sortable'		=> true,
+														'sort_url'		=> 'description',
+														'content'		=> __('Description','cftp_admin'),
+														'hide'			=> 'phone',
+														'attributes'	=> array(
+																				'class'		=> array( 'description' ),
+																			),
+													),
+													array(
+														'content'		=> __('Size','cftp_admin'),
+														'hide'			=> 'phone',
+													),
+													array(
+														'sortable'		=> true,
+														'sort_url'		=> 'timestamp',
+														'sort_default'	=> true,
+														'content'		=> __('Date','cftp_admin'),
+													),
+													array(
+														'content'		=> __('Expiration date','cftp_admin'),
+														'hide'			=> 'phone',
+													),
+													array(
+														'content'		=> __('Download','cftp_admin'),
+														'hide'			=> 'phone',
+													),
+												);
+
+						$table->thead( $thead_columns );
+
+						foreach ($my_files as $file) {
+							$download_link = make_download_link($file);
+
+							$table->add_row();
+
+							/**
+							 * Prepare the information to be used later on the cells array
+							 */
+
+							/** Checkbox */
+							$checkbox = ($file['expired'] == false) ? '<input type="checkbox" name="files[]" value="' . $file["id"] . '" class="batch_checkbox" />' : null;
+
+							/** File title */
+							$file_title_content = '<strong>' . htmlentities($file['name']) . '</strong>';
+							if ($file['expired'] == false) {
+								$filetitle = '<a href="' . $download_link . '" target="_blank">' . $file_title_content . '</a>';
+							}
+							else {
+								$filetitle = $file_title_content;
+							}
+
+							/** Extension */
+							$extension_cell = '<span class="label label-success label_big">' . $file['extension'] . '</span>';
+
+							/** Description */
+							$description = htmlentities_allowed($file['description']);
+
+							/** File size */
+							$file_size_cell = '-'; // default
+							$file_absolute_path = UPLOADED_FILES_DIR . DS . $file['url'];
+							if ( file_exists( $file_absolute_path ) ) {
+								$this_file_size = get_real_size(UPLOADED_FILES_DIR.DS.$file['url']);
+								$file_size_cell = format_file_size($this_file_size);
+							}
+
+							/** Date */
+							$date = date(TIMEFORMAT,strtotime($file['timestamp']));
+
+							/** Expiration */
+							if ( $file['expires'] == '1' ) {
+								if ( $file['expired'] == false ) {
+									$class = 'primary';
+								} else {
+									$class = 'danger';
+								}
+
+								$value = date( TIMEFORMAT, strtotime( $file['expiry_date'] ) );
+							} else {
+								$class = 'success';
+								$value = __('Never','cftp_template');
+							}
+
+							$expiration_cell = '<span class="label label-' . $class . ' label_big">' . $value . '</span>';
+
+							/** Thumbnail */
+							$preview_cell = '';
+							if ( $file['expired'] == false ) {
+								if ( file_is_image( $file_absolute_path ) ) {
+									$thumbnail = make_thumbnail( $file_absolute_path, null, TEMPLATE_THUMBNAILS_WIDTH, TEMPLATE_THUMBNAILS_HEIGHT );
+									if ( !empty( $thumbnail['thumbnail']['url'] ) ) {
+										$preview_cell = '<img src="' . $thumbnail['thumbnail']['url'] . '" class="thumbnail" alt="' . htmlentities($file['name']) .'" />';
+									}
 								}
 							}
-						?>
-					</tbody>
-				</table>
 
-				<nav aria-label="<?php _e('Results navigation','cftp_admin'); ?>">
-					<div class="pagination_wrapper text-center">
-						<ul class="pagination hide-if-no-paging"></ul>
-					</div>
-				</nav>
+							/** Download */
+							if ($file['expired'] == true) {
+								$download_link		= 'javascript:void(0);';
+								$download_btn_class	= 'btn btn-danger btn-sm disabled';
+								$download_text		= __('File expired','cftp_template');
+							}
+							else {
+								$download_btn_class	= 'btn btn-primary btn-sm btn-wide';
+								$download_text		= __('Download','cftp_template');
+							}
+							$download_cell = '<a href="' . $download_link . '" class="' . $download_btn_class . '" target="_blank">' . $download_text . '</a>';
+
+
+
+							$tbody_cells = array(
+													array(
+														'content'		=> $checkbox,
+													),
+													array(
+														'content'		=> $preview_cell,
+														'attributes'	=> array(
+																				'class'		=> array( 'extra' ),
+																			),
+													),
+													array(
+														'content'		=> $filetitle,
+														'attributes'	=> array(
+																				'class'		=> array( 'file_name' ),
+																			),
+													),
+													array(
+														'content'		=> $extension_cell,
+														'attributes'	=> array(
+																				'class'		=> array( 'extra' ),
+																			),
+													),
+													array(
+														'content'		=> $description,
+														'attributes'	=> array(
+																				'class'		=> array( 'description' ),
+																			),
+													),
+													array(
+														'content'		=> $file_size_cell,
+													),
+													array(
+														'content'		=> $date,
+													),
+													array(
+														'content'		=> $expiration_cell,
+													),
+													array(
+														'content'		=> $download_cell,
+														'attributes'	=> array(
+																				'class'		=> array( 'text-center' ),
+																			),
+													),
+												);
+
+							foreach ( $tbody_cells as $cell ) {
+								$table->add_cell( $cell );
+							}
+
+							$table->end_row();
+						}
+
+						echo $table->render();
+
+						/**
+						 * PAGINATION
+						 */
+						$pagination_args = array(
+												'link'		=> basename($_SERVER['SCRIPT_FILENAME']),
+												'current'	=> $pagination_page,
+												'pages'		=> ceil( $count_for_pagination / TEMPLATE_RESULTS_PER_PAGE ),
+											);
+
+						echo $table->pagination( $pagination_args );
+
+
+					}
+				?>
 			</form>
-		
+
 		</div> <!-- right_column -->
-	
-	
 	</div> <!-- wrapper -->
-	
+
 	<?php default_footer_info(); ?>
 
-	<script type="text/javascript">
-		$(document).ready(function() {
-			$("#do_action").click(function() {
-				var checks = $("td>input:checkbox").serializeArray(); 
-				if (checks.length == 0) { 
-					alert('<?php _e('Please select at least one file to proceed.','cftp_admin'); ?>');
-					return false; 
-				} 
-				else {
-					var action = $('#action').val();
-					if (action == 'zip') {
-
-						var checkboxes = $.map($('input:checkbox:checked'), function(e,i) {
-							if (e.value != '0') {
-								return +e.value;
-							}
-						});
-						
-						$(document).psendmodal();
-						$('.modal_content').html('<p class="loading-img"><img src="<?php echo BASE_URI; ?>img/ajax-loader.gif" alt="Loading" /></p>'+
-													'<p class="lead text-center text-info"><?php _e('Please wait while your download is prepared.','cftp_admin'); ?></p>'+
-													'<p class="text-center text-info"><?php _e('This operation could take a few minutes, depending on the size of the files.','cftp_admin'); ?></p>'
-												);
-						$.get('<?php echo BASE_URI; ?>process.php', { do:"zip_download", client:"<?php echo CURRENT_USER_USERNAME; ?>", files:checkboxes },
-							function(data) {
-								var url = '<?php echo BASE_URI; ?>process-zip-download.php?file=' + data;
-								$('.modal_content').append("<iframe id='modal_zip'></iframe>");
-								$('#modal_zip').attr('src', url);
-								// Close the modal window
-								//remove_modal();
-							}
-						);
-					}
-				return false;
-				}
-			});
-
-		});
-	</script>
-
+</div>
 	<?php
+        render_json_variables();
+
 		load_js_files();
 	?>
 </body>

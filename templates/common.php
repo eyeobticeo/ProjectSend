@@ -27,17 +27,16 @@ $is_template = true;
  */
 $lang = SITE_LANG;
 if(!isset($ld)) { $ld = 'cftp_admin'; }
-require_once(ROOT_DIR.'/includes/classes/i18n.php');
-I18n::LoadDomain(ROOT_DIR."/templates/".TEMPLATE_USE."/lang/{$lang}.mo", $ld);
+ProjectSend\I18n::LoadDomain(ROOT_DIR."/templates/".SELECTED_CLIENTS_TEMPLATE."/lang/{$lang}.mo", $ld);
 
-$this_template = BASE_URI.'templates/'.TEMPLATE_USE.'/';
+$this_template = TEMPLATES_URI.'/'.SELECTED_CLIENTS_TEMPLATE.'/';
 
-include_once(ROOT_DIR.'/templates/session_check.php');
+include_once(TEMPLATES_DIR . DS . 'session_check.php');
 
 /**
  * URI to the default template CSS file.
  */
-$this_template_css = BASE_URI.'templates/'.TEMPLATE_USE.'/main.css';
+$this_template_css = $this_template.'/main.css';
 
 global $dbh;
 
@@ -49,18 +48,12 @@ $client_info = get_client_by_username($this_user);
 /**
  * Get the list of different groups the client belongs to.
  */
-$sql_groups = $dbh->prepare( "SELECT DISTINCT group_id FROM " . TABLE_MEMBERS . " WHERE client_id=:id" );
-$sql_groups->bindParam(':id', $client_info['id'], PDO::PARAM_INT);
-$sql_groups->execute();
-$count_groups = $sql_groups->rowCount();
-
-if ($count_groups > 0) {
-	$sql_groups	->setFetchMode(PDO::FETCH_ASSOC);
-	while ( $row = $sql_groups->fetch() ) {
-		$groups_ids[] = $row["group_id"];
-	}
-	$found_groups = implode(',',$groups_ids);
-}
+$get_groups		= new \ProjectSend\MembersActions();
+$get_arguments	= array(
+						'client_id'	=> $client_info['id'],
+						'return'	=> 'list',
+					);
+$found_groups	= $get_groups->client_get_groups($get_arguments);
 
 /**
  * Define the arrays so they can't be empty
@@ -68,6 +61,11 @@ if ($count_groups > 0) {
 $found_all_files_array	= array();
 $found_own_files_temp	= array();
 $found_group_files_temp	= array();
+
+/** Category filter */
+if ( !empty( $_GET['category'] ) ) {
+	$category_filter = $_GET['category'];
+}
 
 /**
  * Get the client's own files
@@ -161,7 +159,7 @@ if (!empty($found_own_files_ids) || !empty($found_group_files_ids)) {
 						':search_ids' => $ids_to_search
 					);
 
-	/** Add the search terms */	
+	/** Add the search terms */
 	if ( isset($_GET['search']) && !empty($_GET['search']) ) {
 		$files_query		.= " AND (filename LIKE :title OR description LIKE :description)";
 		$no_results_error	= 'search';
@@ -169,9 +167,34 @@ if (!empty($found_own_files_ids) || !empty($found_group_files_ids)) {
 		$params[':title']		= '%'.$_GET['search'].'%';
 		$params[':description']	= '%'.$_GET['search'].'%';
 	}
-	
+
+
+	/**
+	 * Add the order.
+	 * Defaults to order by: timestamp, order: DESC (shows last uploaded files first)
+	 */
+	$files_query .= sql_add_order( TABLE_FILES, 'timestamp', 'desc' );
+
+	/**
+	 * Pre-query to count the total results
+	*/
+	$count_sql = $dbh->prepare( $files_query );
+	$count_sql->execute($params);
+	$count_for_pagination = $count_sql->rowCount();
+
+	/**
+	 * Repeat the query but this time, limited by pagination
+	 */
+	$files_query .= " LIMIT :limit_start, :limit_number";
 	$sql_files = $dbh->prepare( $files_query );
+
+	$pagination_page			= ( isset( $_GET["page"] ) ) ? $_GET["page"] : 1;
+	$pagination_start			= ( $pagination_page - 1 ) * TEMPLATE_RESULTS_PER_PAGE;
+	$params[':limit_start']		= $pagination_start;
+	$params[':limit_number']	= TEMPLATE_RESULTS_PER_PAGE;
+
 	$sql_files->execute( $params );
+	$count = $sql_files->rowCount();
 
 	$sql_files->setFetchMode(PDO::FETCH_ASSOC);
 	while ( $data = $sql_files->fetch() ) {
@@ -198,10 +221,15 @@ if (!empty($found_own_files_ids) || !empty($found_group_files_ids)) {
 				$origin = 'group';
 			}
 			*/
+			$pathinfo = pathinfo($data['url']);
+
 			$my_files[$f] = array(
 								//'origin'		=> $origin,
 								'id'			=> $data['id'],
 								'url'			=> $data['url'],
+								'dir'			=> UPLOADED_FILES_DIR . DS . $data['url'],
+								'save_as'		=> (!empty( $data['original_url'] ) ) ? $data['original_url'] : $data['url'],
+								'extension'		=> strtolower($pathinfo['extension']),
 								'name'			=> $data['filename'],
 								'description'	=> $data['description'],
 								'timestamp'		=> $data['timestamp'],
@@ -212,7 +240,7 @@ if (!empty($found_own_files_ids) || !empty($found_group_files_ids)) {
 			$f++;
 		}
 	}
-	
+
 }
 
 // DEBUG
@@ -221,4 +249,3 @@ if (!empty($found_own_files_ids) || !empty($found_group_files_ids)) {
 
 /** Get the url for the logo from "Branding" */
 $logo_file_info = generate_logo_url();
-?>
